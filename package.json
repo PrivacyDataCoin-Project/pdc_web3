@@ -1,0 +1,69 @@
+{
+  "name": "@privacydatacoin/pdc_web3",
+  "version": "0.1.0-beta.0",
+  "description": "TypeScript SDK for PrivacyDataCoin (PDC) - Wallet RPC, Daemon RPC, and Browser Extension bridge",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && tsc -m ESNext --outDir dist/esm && npm run build:declaration",
+    "build:declaration": "tsc --declaration --emitDeclarationOnly --outDir dist",
+    "dev": "tsc -w",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "docs": "typedoc --out docs src/index.ts"
+  },
+  "keywords": [
+    "privacydatacoin",
+    "pdc",
+    "zano",
+    "cryptocurrency",
+    "wallet",
+    "rpc",
+    "typescript",
+    "sdk"
+  ],
+  "author": "ArqTras <biuro@ar-net.info>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PrivacyDataCoin-Project/pdc_web3.git",
+    "directory": "pdc_web3"
+  },
+  "bugs": {
+    "url": "https://github.com/PrivacyDataCoin-Project/pdc_web3/issues"
+  },
+  "homepage": "https://github.com/PrivacyDataCoin-Project/pdc_web3#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "axios": "^1.6.0",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "typedoc": "^0.25.0"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com/"
+  }
+}

@@ -35,31 +35,29 @@ export function hexToBigint(hex: string): bigint {
 
 // Convert atomic units to human-readable string
 export function atomicToHuman(
-  atomic: bigint, 
+  atomic: bigint,
   decimalPoint: number,
   options?: { trimTrailingZeros?: boolean; maxDecimals?: number }
 ): string {
   const negative = atomic < 0;
   const abs = negative ? -atomic : atomic;
   const divisor = 10n ** BigInt(decimalPoint);
-  
+
   const whole = abs / divisor;
   const fraction = abs % divisor;
-  
+
   let fractionStr = fraction.toString().padStart(decimalPoint, '0');
-  
+
   if (options?.trimTrailingZeros !== false) {
     fractionStr = fractionStr.replace(/0+$/, '');
   }
-  
+
   if (options?.maxDecimals !== undefined && fractionStr.length > options.maxDecimals) {
     fractionStr = fractionStr.slice(0, options.maxDecimals);
   }
-  
-  const result = fractionStr 
-    ? `${whole}.${fractionStr}` 
-    : whole.toString();
-  
+
+  const result = fractionStr ? `${whole}.${fractionStr}` : whole.toString();
+
   return negative ? `-${result}` : result;
 }
 
@@ -67,20 +65,20 @@ export function atomicToHuman(
 export function humanToAtomic(human: string, decimalPoint: number): bigint {
   const negative = human.startsWith('-');
   const clean = negative ? human.slice(1) : human;
-  
+
   const [whole, fraction = ''] = clean.split('.');
   const paddedFraction = fraction.padEnd(decimalPoint, '0').slice(0, decimalPoint);
-  
+
   const wholePart = BigInt(whole || '0') * 10n ** BigInt(decimalPoint);
   const fractionPart = BigInt(paddedFraction || '0');
-  
+
   return negative ? -(wholePart + fractionPart) : wholePart + fractionPart;
 }
 
 // Format with ticker
 export function formatAmount(
-  atomic: bigint, 
-  decimalPoint: number, 
+  atomic: bigint,
+  decimalPoint: number,
   ticker: string,
   options?: { trimTrailingZeros?: boolean; maxDecimals?: number }
 ): string {

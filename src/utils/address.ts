@@ -3,17 +3,17 @@
  * Validation, formatting, and conversion
  */
 
-import { PdcNetwork } from '../models/network';
+import type { PdcNetwork } from '../models/network';
 
 // PDC address prefixes
 export const PDC_ADDRESS_PREFIXES = {
   mainnet: 'pdc',
   testnet: 'tpdc',
   stagenet: 'spdc',
-  regtest: 'rpdc'
+  regtest: 'rpdc',
 } as const;
 
-export type PdcAddressPrefix = typeof PDC_ADDRESS_PREFIXES[keyof typeof PDC_ADDRESS_PREFIXES];
+export type PdcAddressPrefix = (typeof PDC_ADDRESS_PREFIXES)[keyof typeof PDC_ADDRESS_PREFIXES];
 
 /**
  * Validate PDC address format
@@ -21,12 +21,12 @@ export type PdcAddressPrefix = typeof PDC_ADDRESS_PREFIXES[keyof typeof PDC_ADDR
  */
 export function isValidPdcAddress(address: string, network?: PdcNetwork): boolean {
   if (!address || typeof address !== 'string') return false;
-  
+
   // Check for alias format
   if (address.startsWith('@')) {
     return isValidAlias(address);
   }
-  
+
   // Check prefix if network specified
   if (network) {
     const prefix = PDC_ADDRESS_PREFIXES[network];
@@ -36,10 +36,10 @@ export function isValidPdcAddress(address: string, network?: PdcNetwork): boolea
     const hasValidPrefix = Object.values(PDC_ADDRESS_PREFIXES).some(p => address.startsWith(p));
     if (!hasValidPrefix) return false;
   }
-  
+
   // Basic length check (PDC addresses are ~106 chars base58)
   if (address.length < 90 || address.length > 110) return false;
-  
+
   // Base58 character set validation
   const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
   return base58Regex.test(address);
@@ -51,15 +51,16 @@ export function isValidPdcAddress(address: string, network?: PdcNetwork): boolea
 export function isValidAlias(alias: string): boolean {
   if (!alias || typeof alias !== 'string') return false;
   if (!alias.startsWith('@')) return false;
-  
+
   const name = alias.slice(1);
-  
+
   // Alias rules: 3-64 chars, lowercase alphanumeric, hyphen, underscore
   // Cannot start/end with hyphen/underscore
   if (name.length < 3 || name.length > 64) return false;
   if (!/^[a-z0-9][a-z0-9_-]*[a-z0-9]$/.test(name)) return false;
-  if (name.startsWith('-') || name.startsWith('_') || name.endsWith('-') || name.endsWith('_')) return false;
-  
+  if (name.startsWith('-') || name.startsWith('_') || name.endsWith('-') || name.endsWith('_'))
+    return false;
+
   return true;
 }
 

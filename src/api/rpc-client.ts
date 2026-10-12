@@ -2,8 +2,9 @@
  * Base RPC Client for PDC
  * Handles JSON-RPC 2.0 communication with Wallet RPC and Daemon RPC
  */
-import axios, { AxiosInstance, AxiosError } from 'axios';
-import { RpcRequest, RpcResponse, RpcError } from '../models/rpc-types';
+import type { AxiosInstance, AxiosError } from 'axios';
+import axios from 'axios';
+import type { RpcRequest, RpcResponse, RpcError } from '../models/rpc-types';
 
 export interface RpcClientConfig {
   url: string;
@@ -18,9 +19,10 @@ export class RpcClient {
   protected requestId = 0;
 
   constructor(config: RpcClientConfig) {
-    const auth = config.username && config.password
-      ? { username: config.username, password: config.password }
-      : undefined;
+    const auth =
+      config.username && config.password
+        ? { username: config.username, password: config.password }
+        : undefined;
 
     this.client = axios.create({
       baseURL: config.url,
@@ -28,13 +30,13 @@ export class RpcClient {
       auth,
       headers: {
         'Content-Type': 'application/json',
-        ...config.headers
-      }
+        ...config.headers,
+      },
     });
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
-      (response) => response,
+      response => response,
       (error: AxiosError) => {
         const responseData = error.response?.data as { error?: RpcError } | undefined;
         if (responseData?.error) {
@@ -54,19 +56,16 @@ export class RpcClient {
     return ++this.requestId;
   }
 
-  async call<TParams, TResult>(
-    method: string,
-    params?: TParams
-  ): Promise<TResult> {
+  async call<TParams, TResult>(method: string, params?: TParams): Promise<TResult> {
     const request: RpcRequest<TParams> = {
       jsonrpc: '2.0',
       id: this.nextId(),
       method,
-      params
+      params,
     };
 
     const response = await this.client.post<RpcResponse<TResult>>('', request);
-    
+
     if (response.data.error) {
       throw new RpcClientError(
         response.data.error.message,
@@ -81,22 +80,18 @@ export class RpcClient {
   async batchCall<TParams, TResult>(
     calls: Array<{ method: string; params?: TParams }>
   ): Promise<TResult[]> {
-    const requests: RpcRequest<TParams>[] = calls.map((call) => ({
+    const requests: RpcRequest<TParams>[] = calls.map(call => ({
       jsonrpc: '2.0',
       id: this.nextId(),
       method: call.method,
-      params: call.params
+      params: call.params,
     }));
 
     const response = await this.client.post<RpcResponse<TResult>[]>(requests as unknown as string);
-    
-    return response.data.map((r) => {
+
+    return response.data.map(r => {
       if (r.error) {
-        throw new RpcClientError(
-          r.error.message,
-          r.error.code,
-          r.error.data
-        );
+        throw new RpcClientError(r.error.message, r.error.code, r.error.data);
       }
       return r.result as TResult;
     });
@@ -131,7 +126,7 @@ export class RpcClientError extends Error {
     this.name = 'RpcClientError';
     this.code = code;
     this.data = data;
-    
+
     // Maintains proper stack trace in V8 environments
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, RpcClientError);
@@ -171,5 +166,5 @@ export const RPC_ERROR_CODES = {
   WALLET_RPC_ERROR_CODE_ALIAS_NOT_FOUND: -1010,
   WALLET_RPC_ERROR_CODE_STAKING_NOT_AVAILABLE: -1011,
   WALLET_RPC_ERROR_CODE_SWAP_INVALID: -1012,
-  WALLET_RPC_ERROR_CODE_SWAP_EXPIRED: -1013
+  WALLET_RPC_ERROR_CODE_SWAP_EXPIRED: -1013,
 } as const;

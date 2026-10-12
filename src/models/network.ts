@@ -6,7 +6,7 @@ export enum PdcNetwork {
   MAINNET = 'mainnet',
   TESTNET = 'testnet',
   STAGENET = 'stagenet',
-  REGTEST = 'regtest'
+  REGTEST = 'regtest',
 }
 
 export interface PdcNetworkConfig {
@@ -33,7 +33,7 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     defaultWalletRpcPort: 19311,
     defaultFee: 1000000000n, // 0.01 PDC
     decimalPoint: 12,
-    dustThreshold: 100000000n // 0.001 PDC
+    dustThreshold: 100000000n, // 0.001 PDC
   },
   [PdcNetwork.TESTNET]: {
     name: PdcNetwork.TESTNET,
@@ -45,7 +45,7 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     defaultWalletRpcPort: 29311,
     defaultFee: 1000000000n,
     decimalPoint: 12,
-    dustThreshold: 100000000n
+    dustThreshold: 100000000n,
   },
   [PdcNetwork.STAGENET]: {
     name: PdcNetwork.STAGENET,
@@ -57,7 +57,7 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     defaultWalletRpcPort: 39311,
     defaultFee: 1000000000n,
     decimalPoint: 12,
-    dustThreshold: 100000000n
+    dustThreshold: 100000000n,
   },
   [PdcNetwork.REGTEST]: {
     name: PdcNetwork.REGTEST,
@@ -69,8 +69,8 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     defaultWalletRpcPort: 19311,
     defaultFee: 1000000000n,
     decimalPoint: 12,
-    dustThreshold: 100000000n
-  }
+    dustThreshold: 100000000n,
+  },
 };
 
 export function getNetworkConfig(network: PdcNetwork): PdcNetworkConfig {

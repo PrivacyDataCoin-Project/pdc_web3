@@ -38,11 +38,11 @@ export type ExtensionPermission =
   | 'daemon.rpc';
 
 export interface ExtensionEventMap {
-  'connect': ExtensionWalletInfo;
-  'disconnect': void;
-  'accountsChanged': string[];
-  'networkChanged': string;
-  'balanceChanged': { assetId: string; balance: bigint };
+  connect: ExtensionWalletInfo;
+  disconnect: void;
+  accountsChanged: string[];
+  networkChanged: string;
+  balanceChanged: { assetId: string; balance: bigint };
 }
 
 export type ExtensionEventCallback<K extends keyof ExtensionEventMap> = (
@@ -52,10 +52,12 @@ export type ExtensionEventCallback<K extends keyof ExtensionEventMap> = (
 export class ExtensionBridge {
   private connected = false;
   private walletInfo: ExtensionWalletInfo | null = null;
-  private eventListeners: Map<keyof ExtensionEventMap, Set<Function>> = new Map();
+  private eventListeners: Map<keyof ExtensionEventMap, Set<(data: unknown) => void>> = new Map();
   private messageId = 0;
-  private pendingRequests: Map<number, { resolve: Function; reject: Function }> = new Map();
-
+  private pendingRequests: Map<
+    number,
+    { resolve: (value: unknown) => void; reject: (reason: Error) => void }
+  > = new Map();
 
   constructor() {
     // Listen for messages from extension
@@ -66,15 +68,27 @@ export class ExtensionBridge {
 
   private handleMessage(event: MessageEvent): void {
     // Only accept messages from the extension
-    if (event.source !== window || !event.data?.pdcExtension) return;
+    const rawData: unknown = event.data;
+    if (
+      event.source !== window ||
+      (rawData as { pdcExtension?: boolean } | null)?.pdcExtension !== true
+    )
+      return;
 
-    const { id, result, error, event: eventName, data } = event.data;
+    interface ExtensionMessage {
+      id?: number;
+      result?: unknown;
+      error?: { message: string; code: number; data?: unknown };
+      event?: keyof ExtensionEventMap;
+      data?: unknown;
+    }
+    const { id, result, error, event: eventName, data } = event.data as ExtensionMessage;
 
     // Handle response to our request
     if (id !== undefined && this.pendingRequests.has(id)) {
       const { resolve, reject } = this.pendingRequests.get(id)!;
       this.pendingRequests.delete(id);
-      
+
       if (error) {
         reject(new ExtensionError(error.message, error.code, error.data));
       } else {
@@ -95,12 +109,15 @@ export class ExtensionBridge {
       const id = ++this.messageId;
       this.pendingRequests.set(id, { resolve, reject });
 
-      window.postMessage({
-        pdcExtension: true,
-        id,
-        method,
-        params
-      }, '*');
+      window.postMessage(
+        {
+          pdcExtension: true,
+          id,
+          method,
+          params,
+        },
+        '*'
+      );
 
       // Timeout after 30 seconds
       setTimeout(() => {
@@ -115,7 +132,7 @@ export class ExtensionBridge {
   // ============ Connection ============
 
   async connect(request: ExtensionConnectionRequest): Promise<ExtensionWalletInfo> {
-    const result = await this.sendMessage('pdc.connect', request) as ExtensionWalletInfo;
+    const result = (await this.sendMessage('pdc.connect', request)) as ExtensionWalletInfo;
     this.connected = true;
     this.walletInfo = result;
     this.emit('connect', result);
@@ -130,7 +147,7 @@ export class ExtensionBridge {
   }
 
   async validateConnection(): Promise<ExtensionWalletInfo> {
-    const result = await this.sendMessage('pdc.getWalletInfo') as ExtensionWalletInfo;
+    const result = (await this.sendMessage('pdc.getWalletInfo')) as ExtensionWalletInfo;
     this.connected = true;
     this.walletInfo = result;
     return result;
@@ -147,16 +164,37 @@ export class ExtensionBridge {
   // ============ Wallet Operations ============
 
   async getAddress(): Promise<string> {
-    const result = await this.sendMessage('pdc.getAddress') as { address: string };
+    const result = (await this.sendMessage('pdc.getAddress')) as { address: string };
     return result.address;
   }
 
   async getBalance(assetId?: string): Promise<{ unlocked: bigint; locked: bigint }> {
-    return this.sendMessage('pdc.getBalance', { asset_id: assetId }) as Promise<{ unlocked: bigint; locked: bigint }>;
+    return this.sendMessage('pdc.getBalance', { asset_id: assetId }) as Promise<{
+      unlocked: bigint;
+      locked: bigint;
+    }>;
   }
 
-  async getAssets(): Promise<Array<{ asset_id: string; name: string; ticker: string; decimal_point: number; unlocked: bigint; locked: bigint }>> {
-    return this.sendMessage('pdc.getAssets') as Promise<Array<{ asset_id: string; name: string; ticker: string; decimal_point: number; unlocked: bigint; locked: bigint }>>;
+  async getAssets(): Promise<
+    Array<{
+      asset_id: string;
+      name: string;
+      ticker: string;
+      decimal_point: number;
+      unlocked: bigint;
+      locked: bigint;
+    }>
+  > {
+    return this.sendMessage('pdc.getAssets') as Promise<
+      Array<{
+        asset_id: string;
+        name: string;
+        ticker: string;
+        decimal_point: number;
+        unlocked: bigint;
+        locked: bigint;
+      }>
+    >;
   }
 
   async transfer(params: {
@@ -171,19 +209,37 @@ export class ExtensionBridge {
   }
 
   async getAliases(): Promise<Array<{ alias: string; address: string; comment: string }>> {
-    return this.sendMessage('pdc.getAliases') as Promise<Array<{ alias: string; address: string; comment: string }>>;
+    return this.sendMessage('pdc.getAliases') as Promise<
+      Array<{ alias: string; address: string; comment: string }>
+    >;
   }
 
-  async registerAlias(params: { alias: string; comment?: string; fee: bigint }): Promise<{ tx_hash: string }> {
+  async registerAlias(params: {
+    alias: string;
+    comment?: string;
+    fee: bigint;
+  }): Promise<{ tx_hash: string }> {
     return this.sendMessage('pdc.registerAlias', params) as Promise<{ tx_hash: string }>;
   }
 
-  async updateAlias(params: { alias: string; comment?: string; fee: bigint }): Promise<{ tx_hash: string }> {
+  async updateAlias(params: {
+    alias: string;
+    comment?: string;
+    fee: bigint;
+  }): Promise<{ tx_hash: string }> {
     return this.sendMessage('pdc.updateAlias', params) as Promise<{ tx_hash: string }>;
   }
 
-  async getStakingInfo(): Promise<{ active: boolean; estimated_time_to_block: number; stake_amount: bigint }> {
-    return this.sendMessage('pdc.getStakingInfo') as Promise<{ active: boolean; estimated_time_to_block: number; stake_amount: bigint }>;
+  async getStakingInfo(): Promise<{
+    active: boolean;
+    estimated_time_to_block: number;
+    stake_amount: bigint;
+  }> {
+    return this.sendMessage('pdc.getStakingInfo') as Promise<{
+      active: boolean;
+      estimated_time_to_block: number;
+      stake_amount: bigint;
+    }>;
   }
 
   async setStaking(enabled: boolean): Promise<void> {
@@ -199,7 +255,9 @@ export class ExtensionBridge {
     expiration_time: number;
     destination_address: string;
   }): Promise<{ hex_raw_proposal: string }> {
-    return this.sendMessage('pdc.createSwapProposal', params) as Promise<{ hex_raw_proposal: string }>;
+    return this.sendMessage('pdc.createSwapProposal', params) as Promise<{
+      hex_raw_proposal: string;
+    }>;
   }
 
   async getSwapProposalInfo(hex_raw_proposal: string): Promise<{
@@ -209,11 +267,19 @@ export class ExtensionBridge {
     expiration_time: number;
     proposer_address: string;
   }> {
-    return this.sendMessage('pdc.getSwapProposalInfo', { hex_raw_proposal }) as Promise<any>;
+    return this.sendMessage('pdc.getSwapProposalInfo', { hex_raw_proposal }) as Promise<{
+      to_finalizer: Array<{ asset_id: string; amount: bigint }>;
+      to_initiator: Array<{ asset_id: string; amount: bigint }>;
+      fee_paid_by_a: bigint;
+      expiration_time: number;
+      proposer_address: string;
+    }>;
   }
 
   async acceptSwapProposal(hex_raw_proposal: string): Promise<{ result_tx_id: string }> {
-    return this.sendMessage('pdc.acceptSwapProposal', { hex_raw_proposal }) as Promise<{ result_tx_id: string }>;
+    return this.sendMessage('pdc.acceptSwapProposal', { hex_raw_proposal }) as Promise<{
+      result_tx_id: string;
+    }>;
   }
 
   // ============ Marketplace ============
@@ -242,16 +308,19 @@ export class ExtensionBridge {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, new Set());
     }
-    this.eventListeners.get(event)!.add(callback);
-    
+    const listeners = this.eventListeners.get(event)!;
+    listeners.add(callback as (data: unknown) => void);
+
     // Return unsubscribe function
-    return () => this.off(event, callback);
+    return () => {
+      listeners.delete(callback as (data: unknown) => void);
+    };
   }
 
   off<K extends keyof ExtensionEventMap>(event: K, callback: ExtensionEventCallback<K>): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
-      listeners.delete(callback);
+      listeners.delete(callback as (data: unknown) => void);
     }
   }
 
@@ -265,22 +334,23 @@ export class ExtensionBridge {
   // ============ Static helpers ============
 
   static async detectExtension(): Promise<boolean> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       if (typeof window === 'undefined') {
         resolve(false);
         return;
       }
 
       const timeout = setTimeout(() => resolve(false), 100);
-      
+
       const handler = (event: MessageEvent) => {
-        if (event.data?.pdcExtension === true && event.data.method === 'pdc.ping') {
+        const msg = event.data as { pdcExtension?: boolean; method?: string } | null;
+        if (msg?.pdcExtension === true && msg.method === 'pdc.ping') {
           clearTimeout(timeout);
           window.removeEventListener('message', handler);
           resolve(true);
         }
       };
-      
+
       window.addEventListener('message', handler);
       window.postMessage({ pdcExtension: true, method: 'pdc.ping' }, '*');
     });
@@ -289,8 +359,8 @@ export class ExtensionBridge {
   static getExtensionId(): string | null {
     // In a real implementation, this would be the Chrome/FF extension ID
     // For now, we use a well-known identifier
-    return typeof window !== 'undefined' 
-      ? (window as any).__PDC_EXTENSION_ID__ ?? null 
+    return typeof window !== 'undefined'
+      ? ((window as unknown as { __PDC_EXTENSION_ID__?: string }).__PDC_EXTENSION_ID__ ?? null)
       : null;
   }
 }
@@ -312,6 +382,7 @@ export const pdcExtension = new ExtensionBridge();
 
 // Auto-detect and expose globally (for non-module scripts)
 if (typeof window !== 'undefined') {
-  (window as any).PdcExtension = pdcExtension;
-  (window as any).pdcExtension = pdcExtension;
+  const globalWindow = window as unknown as Record<string, unknown>;
+  globalWindow['PdcExtension'] = pdcExtension;
+  globalWindow['pdcExtension'] = pdcExtension;
 }

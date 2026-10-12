@@ -5,48 +5,71 @@
 import { RpcClient } from './rpc-client';
 import type {
   // Balance
-  BalanceRequest, BalanceResponse,
+  BalanceRequest,
+  BalanceResponse,
   // Address
   AddressResponse,
   // Wallet Info
   WalletInfoResponse,
   // Transfer
-  TransferRequest, TransferResponse,
+  TransferRequest,
+  TransferResponse,
   // Alias
-  AliasRegisterRequest, AliasRegisterResponse,
-  AliasUpdateRequest, AliasUpdateResponse,
-  AliasTransferRequest, AliasTransferResponse,
-  AliasLookupRequest, AliasLookupResponse,
-  AliasCostRequest, AliasCostResponse,
+  AliasRegisterRequest,
+  AliasRegisterResponse,
+  AliasUpdateRequest,
+  AliasUpdateResponse,
+  AliasTransferRequest,
+  AliasTransferResponse,
+  AliasLookupRequest,
+  AliasLookupResponse,
+  AliasCostRequest,
+  AliasCostResponse,
   // Marketplace
-  MarketplaceGetOffersRequest, MarketplaceGetOffersResponse,
-  MarketplacePushOfferRequest, MarketplacePushOfferResponse,
-  MarketplaceUpdateOfferRequest, MarketplaceUpdateOfferResponse,
-  MarketplaceCancelOfferRequest, MarketplaceCancelOfferResponse,
+  MarketplaceGetOffersRequest,
+  MarketplaceGetOffersResponse,
+  MarketplacePushOfferRequest,
+  MarketplacePushOfferResponse,
+  MarketplaceUpdateOfferRequest,
+  MarketplaceUpdateOfferResponse,
+  MarketplaceCancelOfferRequest,
+  MarketplaceCancelOfferResponse,
   // Ionic Swaps
-  IonicSwapGenerateProposalRequest, IonicSwapGenerateProposalResponse,
-  IonicSwapGetProposalInfoRequest, IonicSwapGetProposalInfoResponse,
-  IonicSwapAcceptProposalRequest, IonicSwapAcceptProposalResponse,
+  IonicSwapGenerateProposalRequest,
+  IonicSwapGenerateProposalResponse,
+  IonicSwapGetProposalInfoRequest,
+  IonicSwapGetProposalInfoResponse,
+  IonicSwapAcceptProposalRequest,
+  IonicSwapAcceptProposalResponse,
   // Asset Whitelist
   AssetWhitelistResponse,
-  AssetWhitelistAddRequest, AssetWhitelistAddResponse,
-  AssetWhitelistRemoveRequest, AssetWhitelistRemoveResponse,
+  AssetWhitelistAddRequest,
+  AssetWhitelistAddResponse,
+  AssetWhitelistRemoveRequest,
+  AssetWhitelistRemoveResponse,
   // Asset Operations
-  DeployAssetRequest, DeployAssetResponse,
-  EmitAssetRequest, EmitAssetResponse,
-  UpdateAssetRequest, UpdateAssetResponse,
-  BurnAssetRequest, BurnAssetResponse,
+  DeployAssetRequest,
+  DeployAssetResponse,
+  EmitAssetRequest,
+  EmitAssetResponse,
+  UpdateAssetRequest,
+  UpdateAssetResponse,
+  BurnAssetRequest,
+  BurnAssetResponse,
   // History
-  GetRecentTxsRequest, GetRecentTxsResponse,
-  SearchTransactionsRequest, SearchTransactionsResponse,
+  GetRecentTxsRequest,
+  GetRecentTxsResponse,
+  SearchTransactionsRequest,
+  SearchTransactionsResponse,
   // Bare Outputs
   BareOutsStatsResponse,
-  SweepBareOutsRequest, SweepBareOutsResponse,
+  SweepBareOutsRequest,
+  SweepBareOutsResponse,
   // Mining
   GetMiningHistoryResponse,
   // Seed/Restore
   GetRestoreInfoResponse,
-  GetSeedPhraseInfoResponse
+  GetSeedPhraseInfoResponse,
 } from '../models/rpc-types';
 
 export interface WalletRpcClientConfig {
@@ -180,33 +203,47 @@ export class WalletRpcClient {
 
   // ============ Marketplace ============
 
-  async getMarketplaceOffers(params?: MarketplaceGetOffersRequest): Promise<MarketplaceGetOffersResponse> {
+  async getMarketplaceOffers(
+    params?: MarketplaceGetOffersRequest
+  ): Promise<MarketplaceGetOffersResponse> {
     return this.client.call('marketplace_get_offers_ex', params);
   }
 
-  async pushMarketplaceOffer(params: MarketplacePushOfferRequest): Promise<MarketplacePushOfferResponse> {
+  async pushMarketplaceOffer(
+    params: MarketplacePushOfferRequest
+  ): Promise<MarketplacePushOfferResponse> {
     return this.client.call('marketplace_push_offer', params);
   }
 
-  async updateMarketplaceOffer(params: MarketplaceUpdateOfferRequest): Promise<MarketplaceUpdateOfferResponse> {
+  async updateMarketplaceOffer(
+    params: MarketplaceUpdateOfferRequest
+  ): Promise<MarketplaceUpdateOfferResponse> {
     return this.client.call('marketplace_push_update_offer', params);
   }
 
-  async cancelMarketplaceOffer(params: MarketplaceCancelOfferRequest): Promise<MarketplaceCancelOfferResponse> {
+  async cancelMarketplaceOffer(
+    params: MarketplaceCancelOfferRequest
+  ): Promise<MarketplaceCancelOfferResponse> {
     return this.client.call('marketplace_cancel_offer', params);
   }
 
   // ============ Ionic Swaps ============
 
-  async generateSwapProposal(params: IonicSwapGenerateProposalRequest): Promise<IonicSwapGenerateProposalResponse> {
+  async generateSwapProposal(
+    params: IonicSwapGenerateProposalRequest
+  ): Promise<IonicSwapGenerateProposalResponse> {
     return this.client.call('ionic_swap_generate_proposal', params);
   }
 
-  async getSwapProposalInfo(params: IonicSwapGetProposalInfoRequest): Promise<IonicSwapGetProposalInfoResponse> {
+  async getSwapProposalInfo(
+    params: IonicSwapGetProposalInfoRequest
+  ): Promise<IonicSwapGetProposalInfoResponse> {
     return this.client.call('ionic_swap_get_proposal_info', params);
   }
 
-  async acceptSwapProposal(params: IonicSwapAcceptProposalRequest): Promise<IonicSwapAcceptProposalResponse> {
+  async acceptSwapProposal(
+    params: IonicSwapAcceptProposalRequest
+  ): Promise<IonicSwapAcceptProposalResponse> {
     return this.client.call('ionic_swap_accept_proposal', params);
   }
 
@@ -220,7 +257,9 @@ export class WalletRpcClient {
     return this.client.call('assets_whitelist_add', params);
   }
 
-  async removeAssetFromWhitelist(params: AssetWhitelistRemoveRequest): Promise<AssetWhitelistRemoveResponse> {
+  async removeAssetFromWhitelist(
+    params: AssetWhitelistRemoveRequest
+  ): Promise<AssetWhitelistRemoveResponse> {
     return this.client.call('assets_whitelist_remove', params);
   }
 
@@ -244,7 +283,10 @@ export class WalletRpcClient {
 
   // ============ Mining ============
 
-  async getMiningHistory(params?: { offset?: number; limit?: number }): Promise<GetMiningHistoryResponse> {
+  async getMiningHistory(params?: {
+    offset?: number;
+    limit?: number;
+  }): Promise<GetMiningHistoryResponse> {
     return this.client.call('get_mining_history', params);
   }
 
@@ -276,4 +318,3 @@ export class WalletRpcClient {
     this.client.clearAuth();
   }
 }
-

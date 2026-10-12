@@ -6,10 +6,14 @@ import { RpcClient } from './rpc-client';
 import type {
   DaemonInfoResponse,
   BlockInfo,
-  GetBlocksFastRequest, GetBlocksFastResponse,
-  GetRandomOutputsRequest, GetRandomOutputsResponse,
-  GetAliasDetailsRequest, GetAliasDetailsResponse,
-  GetAliasRewardRequest, GetAliasRewardResponse
+  GetBlocksFastRequest,
+  GetBlocksFastResponse,
+  GetRandomOutputsRequest,
+  GetRandomOutputsResponse,
+  GetAliasDetailsRequest,
+  GetAliasDetailsResponse,
+  GetAliasRewardRequest,
+  GetAliasRewardResponse,
 } from '../models/rpc-types';
 
 export interface DaemonRpcClientConfig {
@@ -69,7 +73,9 @@ export class DaemonRpcClient {
     return this.client.call('get_aliases_by_address', { address });
   }
 
-  async getRandomOutputsForAmounts(params: GetRandomOutputsRequest): Promise<GetRandomOutputsResponse> {
+  async getRandomOutputsForAmounts(
+    params: GetRandomOutputsRequest
+  ): Promise<GetRandomOutputsResponse> {
     return this.client.call('get_random_outputs_for_amounts', params);
   }
 

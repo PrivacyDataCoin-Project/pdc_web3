@@ -1,5 +1,7 @@
 # @privacydatacoin/pdc_web3
 
+[![CI](https://github.com/PrivacyDataCoin-Project/pdc_web3/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PrivacyDataCoin-Project/pdc_web3/actions/workflows/ci.yml)
+
 TypeScript SDK for **PrivacyDataCoin (PDC)** — Wallet RPC, Daemon RPC, and Browser Extension bridge.
 
 ## Features

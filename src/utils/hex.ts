@@ -92,7 +92,7 @@ export function xorHex(a: string, b: string): string {
   }
   const result = new Uint8Array(bytesA.length);
   for (let i = 0; i < bytesA.length; i++) {
-    result[i] = bytesA[i] ^ bytesB[i];
+    result[i] = (bytesA[i] ?? 0) ^ (bytesB[i] ?? 0);
   }
   return bytesToHex(result);
 }

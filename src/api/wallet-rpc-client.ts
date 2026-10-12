@@ -2,7 +2,7 @@
  * PDC Wallet RPC Client
  * Provides typed methods for all Wallet RPC endpoints
  */
-import { RpcClient, RpcClientError } from './rpc-client';
+import { RpcClient } from './rpc-client';
 import type {
   // Balance
   BalanceRequest, BalanceResponse,
@@ -277,4 +277,3 @@ export class WalletRpcClient {
   }
 }
 
-export { RpcClientError } from './rpc-client';

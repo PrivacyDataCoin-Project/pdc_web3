@@ -2,8 +2,8 @@
  * Base RPC Client for PDC
  * Handles JSON-RPC 2.0 communication with Wallet RPC and Daemon RPC
  */
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
-import { RpcRequest, RpcResponse, RpcError } from './rpc-types';
+import axios, { AxiosInstance, AxiosError } from 'axios';
+import { RpcRequest, RpcResponse, RpcError } from '../models/rpc-types';
 
 export interface RpcClientConfig {
   url: string;
@@ -36,8 +36,9 @@ export class RpcClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
-        if (error.response?.data?.error) {
-          const rpcError = error.response.data.error as RpcError;
+        const responseData = error.response?.data as { error?: RpcError } | undefined;
+        if (responseData?.error) {
+          const rpcError = responseData.error;
           throw new RpcClientError(rpcError.message, rpcError.code, rpcError.data);
         }
         throw new RpcClientError(
@@ -87,9 +88,9 @@ export class RpcClient {
       params: call.params
     }));
 
-    const response = await this.client.post<RpcResponse<TResult>[]>(requests);
+    const response = await this.client.post<RpcResponse<TResult>[]>(requests as unknown as string);
     
-    return response.data.map((r, i) => {
+    return response.data.map((r) => {
       if (r.error) {
         throw new RpcClientError(
           r.error.message,

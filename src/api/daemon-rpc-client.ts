@@ -2,7 +2,7 @@
  * PDC Daemon RPC Client
  * Provides typed methods for all Daemon RPC endpoints
  */
-import { RpcClient, RpcClientError } from './rpc-client';
+import { RpcClient } from './rpc-client';
 import type {
   DaemonInfoResponse,
   BlockInfo,

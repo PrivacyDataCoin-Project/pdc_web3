@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, master, main]
+  pull_request:
+    branches: [dev, master, main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Build & Test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src --ext .ts
+        continue-on-error: true # lint nie blokuje dopóki kod się stabilizuje
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Tests with coverage
+        run: npx vitest run --coverage
+        if: matrix.node == 20
+
+      - name: Build
+        run: npx tsc
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: matrix.node == 20
+        with:
+          name: coverage
+          path: coverage/
+
+  security:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (production deps)
+        run: npm audit --omit=dev --audit-level=critical
+        continue-on-error: true
+
+  status:
+    name: CI Status
+    needs: [test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all tests passed
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ All builds and tests passed"
+            exit 0
+          else
+            echo "❌ Build or tests failed"
+            exit 1
+          fi

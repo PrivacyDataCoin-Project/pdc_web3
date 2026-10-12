@@ -55,7 +55,7 @@ export class ExtensionBridge {
   private eventListeners: Map<keyof ExtensionEventMap, Set<Function>> = new Map();
   private messageId = 0;
   private pendingRequests: Map<number, { resolve: Function; reject: Function }> = new Map();
-  private extensionId: string | null = null;
+
 
   constructor() {
     // Listen for messages from extension
@@ -68,7 +68,7 @@ export class ExtensionBridge {
     // Only accept messages from the extension
     if (event.source !== window || !event.data?.pdcExtension) return;
 
-    const { id, method, result, error, event: eventName, data } = event.data;
+    const { id, result, error, event: eventName, data } = event.data;
 
     // Handle response to our request
     if (id !== undefined && this.pendingRequests.has(id)) {

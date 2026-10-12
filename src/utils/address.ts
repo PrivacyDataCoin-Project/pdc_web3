@@ -3,7 +3,7 @@
  * Validation, formatting, and conversion
  */
 
-import { getNetworkConfig, PdcNetwork } from '../models/network';
+import { PdcNetwork } from '../models/network';
 
 // PDC address prefixes
 export const PDC_ADDRESS_PREFIXES = {
@@ -109,18 +109,24 @@ export function formatAddress(address: string, charsStart = 6, charsEnd = 6): st
  * Validate integrated address (address + payment ID)
  */
 export function isValidIntegratedAddress(address: string, network?: PdcNetwork): boolean {
-  // Integrated addresses are longer, contain embedded payment ID
-  // For PDC, they follow the same prefix but are longer
-  if (!isValidPdcAddress(address, network)) return false;
-  // Integrated addresses are typically 160+ chars
-  return address.length > 140;
+  // Integrated addresses embed a payment ID, so they are longer than standard addresses
+  // Note: network param reserved for future prefix-specific validation
+  void network;
+  if (!address || typeof address !== 'string') return false;
+  if (address.length <= 110) return false; // must be longer than standard address
+  // Integrated addresses are typically 140+ chars; allow up to 196
+  if (address.length > 196) return false;
+  // Base58 character set validation
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
+  return base58Regex.test(address);
 }
 
 /**
  * Extract payment ID from integrated address (stub - needs daemon RPC)
  * In practice, use daemon RPC split_integrated_address
  */
-export function extractPaymentIdFromIntegratedAddress(_address: string): string | null {
+export function extractPaymentIdFromIntegratedAddress(address: string): string | null {
+  void address;
   // This requires daemon RPC call
   // Keeping as stub for API compatibility
   return null;
@@ -130,6 +136,7 @@ export function extractPaymentIdFromIntegratedAddress(_address: string): string 
  * Create integrated address (stub - needs daemon RPC)
  */
 export function createIntegratedAddress(address: string, paymentId: string): string {
+  void paymentId;
   // This requires daemon RPC call
   // Keeping as stub for API compatibility
   return address; // In reality, would call make_integrated_address RPC

@@ -9,10 +9,10 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'lcov'],
       exclude: ['tests/**', 'dist/**', 'node_modules/**'],
       thresholds: {
-        lines: 25,
-        functions: 70,
-        branches: 60,
-        statements: 25
+        lines: 100,
+        functions: 100,
+        statements: 100,
+        branches: 100
       }
     },
     testTimeout: 10000,

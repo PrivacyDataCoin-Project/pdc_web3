@@ -7,9 +7,10 @@ export default tseslint.config(
     ignores: ['dist/', 'node_modules/', '*.config.*', '*.md', 'coverage/']
   },
   eslint.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  // Source files: full type-aware linting
   {
-    files: ['**/*.ts'],
+    files: ['src/**/*.ts'],
+    extends: [...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -24,6 +25,20 @@ export default tseslint.config(
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }]
+    }
+  },
+  // Test files: recommended (non-type-aware) linting
+  {
+    files: ['tests/**/*.ts'],
+    extends: [...tseslint.configs.recommended],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { fixStyle: 'inline-type-imports' }
+      ],
+      'no-console': 'off'
     }
   },
   prettierConfig

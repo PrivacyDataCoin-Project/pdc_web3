@@ -9,7 +9,6 @@ import {
   formatAddress,
   isValidIntegratedAddress
 } from '../src/utils/address';
-import { PdcNetwork } from '../src/models/network';
 
 describe('Address utilities', () => {
   describe('isValidPdcAddress', () => {

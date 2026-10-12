@@ -54,14 +54,10 @@ export function isValidAlias(alias: string): boolean {
 
   const name = alias.slice(1);
 
-  // Alias rules: 3-64 chars, lowercase alphanumeric, hyphen, underscore
-  // Cannot start/end with hyphen/underscore
+  // Alias rules: 3-64 chars, lowercase alphanumeric/hyphen/underscore;
+  // regex guarantees no leading/trailing hyphen or underscore
   if (name.length < 3 || name.length > 64) return false;
-  if (!/^[a-z0-9][a-z0-9_-]*[a-z0-9]$/.test(name)) return false;
-  if (name.startsWith('-') || name.startsWith('_') || name.endsWith('-') || name.endsWith('_'))
-    return false;
-
-  return true;
+  return /^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/.test(name);
 }
 
 /**

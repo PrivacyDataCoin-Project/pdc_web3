@@ -87,7 +87,7 @@ export class RpcClient {
       params: call.params,
     }));
 
-    const response = await this.client.post<RpcResponse<TResult>[]>(requests as unknown as string);
+    const response = await this.client.post<RpcResponse<TResult>[]>('', requests);
 
     return response.data.map(r => {
       if (r.error) {
@@ -134,11 +134,11 @@ export class RpcClientError extends Error {
   }
 
   isWalletError(): boolean {
-    return this.code >= -32000 && this.code <= -32099;
+    return this.code >= -32099 && this.code <= -32000;
   }
 
   isDaemonError(): boolean {
-    return this.code >= -32100 && this.code <= -32199;
+    return this.code >= -32199 && this.code <= -32100;
   }
 
   isTransportError(): boolean {

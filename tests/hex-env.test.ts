@@ -107,17 +107,19 @@ describe('randomHex security (M4)', () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it('throws instead of Math.random when crypto absent (no insecure fallback)', async () => {
-    vi.stubGlobal('crypto', undefined);
-    vi.resetModules();
-    const { randomHex } = await import('../src/utils/hex');
-    expect(() => randomHex(8)).toThrow(/no CSPRNG available/);
-  });
-
   it('rejects negative byteLength', async () => {
     vi.stubGlobal('crypto', undefined);
     vi.resetModules();
     const { randomHex } = await import('../src/utils/hex');
     expect(() => randomHex(-1)).toThrow('byteLength must be >= 0');
+  });
+});
+
+describe('randomHex security (M4) — falsy getRandomValues branch', () => {
+  it('throws when crypto exists but getRandomValues missing', async () => {
+    vi.stubGlobal('crypto', {}); // defined but no getRandomValues
+    vi.resetModules();
+    const { randomHex } = await import('../src/utils/hex');
+    expect(() => randomHex(8)).toThrow(/no CSPRNG available/);
   });
 });

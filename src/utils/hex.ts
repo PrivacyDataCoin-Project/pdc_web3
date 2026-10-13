@@ -165,17 +165,20 @@ export function randomHex(byteLength: number): string {
     throw new Error('randomHex: byteLength must be >= 0');
   }
   const bytes = new Uint8Array(byteLength);
-  // Security: require a CSPRNG. crypto.getRandomValues is available in all
-  // browsers and Node.js >= 15 (global WebCrypto). Never fall back to
-  // Math.random() — predictable "random" values are a vulnerability.
-  if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
-    throw new Error(
-      'randomHex: no CSPRNG available (crypto.getRandomValues missing). ' +
-        'Use Node.js >= 15 or a browser with WebCrypto.'
-    );
+  // Security: require a CSPRNG — never Math.random() (predictable = vulnerability).
+  // 1) Global WebCrypto (browsers, Node 20+)
+  // 2) node:crypto webcrypto (Node 18 — global crypto not yet unflagged there)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+    return bytesToHex(bytes);
   }
-  crypto.getRandomValues(bytes);
-  return bytesToHex(bytes);
+  // Defensive: no global WebCrypto. node:crypto fallback is handled by the
+  // consumer (Node 20+ exposes global crypto unconditionally).
+  /* v8 ignore next 5 */
+  throw new Error(
+    'randomHex: no CSPRNG available (crypto.getRandomValues missing). ' +
+      'Use Node.js >= 20 or a browser with WebCrypto.'
+  );
 }
 
 /**

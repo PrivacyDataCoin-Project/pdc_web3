@@ -177,6 +177,10 @@ await wallet.emitAsset({
 });
 ```
 
+## Requirements
+
+- **Node.js >= 20** (WebCrypto `crypto.getRandomValues` global — required for CSPRNG)
+
 ## Development
 
 ```bash

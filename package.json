@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/PrivacyDataCoin-Project/pdc_web3#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "peerDependencies": {
     "axios": "^1.6.0"

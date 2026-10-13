@@ -94,22 +94,30 @@ describe('hex.ts environment matrix', () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it('fallback branch: randomHex uses Math.random when crypto absent', async () => {
-    const savedCrypto = g.crypto;
-    delete g.crypto;
-    try {
-      const { randomHex } = await importFresh();
-      const hex = randomHex(8);
-      expect(hex.length).toBe(16);
-      expect(/^[0-9a-f]+$/.test(hex)).toBe(true);
-    } finally {
-      if (savedCrypto !== undefined) {
-        Object.defineProperty(g, 'crypto', {
-          value: savedCrypto,
-          configurable: true,
-          writable: true
-        });
-      }
-    }
+
+});
+
+describe('randomHex security (M4)', () => {
+  it('crypto path: uses crypto.getRandomValues when present', async () => {
+    const spy = vi.fn((arr: Uint8Array) => arr.fill(0xab));
+    vi.stubGlobal('crypto', { getRandomValues: spy });
+    vi.resetModules();
+    const { randomHex } = await import('../src/utils/hex');
+    expect(randomHex(8)).toBe('ab'.repeat(8));
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('throws instead of Math.random when crypto absent (no insecure fallback)', async () => {
+    vi.stubGlobal('crypto', undefined);
+    vi.resetModules();
+    const { randomHex } = await import('../src/utils/hex');
+    expect(() => randomHex(8)).toThrow(/no CSPRNG available/);
+  });
+
+  it('rejects negative byteLength', async () => {
+    vi.stubGlobal('crypto', undefined);
+    vi.resetModules();
+    const { randomHex } = await import('../src/utils/hex');
+    expect(() => randomHex(-1)).toThrow('byteLength must be >= 0');
   });
 });

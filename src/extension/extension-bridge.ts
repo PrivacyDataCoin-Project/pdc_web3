@@ -49,6 +49,30 @@ export type ExtensionEventCallback<K extends keyof ExtensionEventMap> = (
   data: ExtensionEventMap[K]
 ) => void;
 
+/**
+ * Trusted origins allowed to talk to this bridge.
+ * - The page's own origin (same-document extension content scripts relay here).
+ * - chrome-extension:// / moz-extension:// are validated separately (opaque ids).
+ */
+let TRUSTED_ORIGINS: readonly string[] = [
+  typeof window !== 'undefined' ? window.location.origin : '',
+].filter(Boolean);
+
+/** Restrict which origins this bridge accepts messages from (call before connect). */
+export function setTrustedOrigins(origins: readonly string[]): void {
+  TRUSTED_ORIGINS = origins.filter(Boolean);
+}
+
+function isTrustedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (TRUSTED_ORIGINS.includes(origin)) return true;
+  // Extension content scripts relay through the page origin, but the MessageEvent
+  // origin for a real extension response is the extension origin. Accept any
+  // extension scheme; the extension must pin exact ids in production via
+  // setTrustedOrigins(['chrome-extension://<id>']).
+  return origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://');
+}
+
 export class ExtensionBridge {
   private connected = false;
   private walletInfo: ExtensionWalletInfo | null = null;
@@ -67,10 +91,13 @@ export class ExtensionBridge {
   }
 
   private handleMessage(event: MessageEvent): void {
-    // Only accept messages from the extension
+    // Security: drop messages from untrusted origins (prevents cross-tab spoofing
+    // of RPC responses and injection of forged results into pendingRequests).
+    if (!isTrustedOrigin(event.origin)) return;
+
+    // Only accept messages relayed by the extension through this document
     const rawData: unknown = event.data;
     if (
-      event.source !== window ||
       (rawData as { pdcExtension?: boolean } | null)?.pdcExtension !== true
     )
       return;
@@ -109,6 +136,8 @@ export class ExtensionBridge {
       const id = ++this.messageId;
       this.pendingRequests.set(id, { resolve, reject });
 
+      // Security: never use '*' — restrict to our own origin; the extension
+      // content script relays to the extension background with its own pinning.
       window.postMessage(
         {
           pdcExtension: true,
@@ -116,7 +145,7 @@ export class ExtensionBridge {
           method,
           params,
         },
-        '*'
+        TRUSTED_ORIGINS[0] ?? window.location.origin
       );
 
       // Timeout after 30 seconds
@@ -352,7 +381,7 @@ export class ExtensionBridge {
       };
 
       window.addEventListener('message', handler);
-      window.postMessage({ pdcExtension: true, method: 'pdc.ping' }, '*');
+      window.postMessage({ pdcExtension: true, method: 'pdc.ping' }, TRUSTED_ORIGINS[0] ?? window.location.origin);
     });
   }
 

@@ -23,6 +23,7 @@ function installFakeWindow(): void {
   const listeners = new Map<string, Set<Listener>>();
   fakeWindow = {
     listeners,
+    location: { origin: 'https://test.local' },
     postMessage: vi.fn(),
     addEventListener: (type, cb) => {
       if (!listeners.has(type)) listeners.set(type, new Set());
@@ -32,7 +33,12 @@ function installFakeWindow(): void {
       listeners.get(type)?.delete(cb);
     },
     dispatch: (data: unknown) => {
-      const evt = { data, source: fakeWindow };
+      // default: trusted same-origin (extension content script relay)
+      const evt = { data, source: fakeWindow, origin: 'https://test.local' };
+      listeners.get('message')?.forEach(cb => cb(evt));
+    },
+    dispatchWithOrigin: (data: unknown, origin: string) => {
+      const evt = { data, source: fakeWindow, origin };
       listeners.get('message')?.forEach(cb => cb(evt));
     }
   };
@@ -520,5 +526,208 @@ describe('ExtensionError', () => {
     expect(err.data).toEqual({ ctx: true });
     expect(err.name).toBe('ExtensionError');
     expect(err instanceof Error).toBe(true);
+  });
+});
+
+describe('origin security (M2)', () => {
+  beforeEach(async () => {
+    installFakeWindow();
+    vi.resetModules();
+    mod = await import('../src/extension/extension-bridge');
+  });
+  afterEach(() => {
+    removeFakeWindow();
+    vi.restoreAllMocks();
+  });
+
+  it('handleMessage drops events from untrusted origin', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const p = bridge.getAddress();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const { id } = postMock.mock.calls[0][0] as { id: number };
+
+    // foreign origin → dropped
+    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'EVIL' } }, 'https://evil.example');
+    await new Promise(r => setTimeout(r, 10));
+
+    // trusted origin → resolved
+    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'pdcOK' } }, 'https://test.local');
+    expect(await p).toBe('pdcOK');
+  });
+
+  it('setTrustedOrigins pins extension id and rejects others', async () => {
+    const { setTrustedOrigins } = mod;
+    setTrustedOrigins(['chrome-extension://abcdef']);
+    const bridge = new mod.ExtensionBridge();
+    const p = bridge.getAddress();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const { id } = postMock.mock.calls[0][0] as { id: number };
+
+    const listeners = ((fakeWindow as any).listeners as Map<string, Set<Listener>>).get('message')!;
+    // evil origin
+    const evil = { data: { pdcExtension: true, id, result: { address: 'EVIL' } }, source: fakeWindow, origin: 'https://evil.example' };
+    listeners.forEach(cb => (cb as (e: unknown) => void)(evil));
+    // trusted extension origin
+    const good = { data: { pdcExtension: true, id, result: { address: 'pdcOK' } }, source: fakeWindow, origin: 'chrome-extension://abcdef' };
+    listeners.forEach(cb => (cb as (e: unknown) => void)(good));
+
+    expect(await p).toBe('pdcOK');
+    setTrustedOrigins([]); // restore default trust model
+  });
+
+  it('postMessage does not use wildcard target origin', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const p = bridge.getAddress();
+    await new Promise(r => setTimeout(r, 5));
+    const [, targetOrigin] = postMock.mock.calls[0];
+    expect(targetOrigin).not.toBe('*');
+    expect(typeof targetOrigin).toBe('string');
+    expect((targetOrigin as string).length).toBeGreaterThan(0);
+    void p;
+  });
+});
+
+describe('origin security — remaining branches', () => {
+  beforeEach(async () => {
+    installFakeWindow();
+    vi.resetModules();
+    mod = await import('../src/extension/extension-bridge');
+  });
+  afterEach(() => {
+    removeFakeWindow();
+    vi.restoreAllMocks();
+  });
+
+  it('isTrustedOrigin: empty origin is untrusted', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const p = bridge.getAddress();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const { id } = postMock.mock.calls[0][0] as { id: number };
+    // empty origin → dropped
+    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'EVIL' } }, '');
+    await new Promise(r => setTimeout(r, 10));
+    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'pdcOK' } }, 'https://test.local');
+    expect(await p).toBe('pdcOK');
+  });
+
+  it('TRUSTED_ORIGINS includes-match short-circuits extension-scheme check', async () => {
+    const { setTrustedOrigins } = mod;
+    setTrustedOrigins(['https://exact-match.example']);
+    const bridge = new mod.ExtensionBridge();
+    const p = bridge.getAddress();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const { id } = postMock.mock.calls[0][0] as { id: number };
+    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'pdcOK' } }, 'https://exact-match.example');
+    expect(await p).toBe('pdcOK');
+    setTrustedOrigins([]);
+  });
+
+  it('sendMessage uses TRUSTED_ORIGINS[0] when set (not location.origin)', async () => {
+    const { setTrustedOrigins } = mod;
+    setTrustedOrigins(['https://pinned.example']);
+    const bridge = new mod.ExtensionBridge();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const p = bridge.getAddress();
+    await new Promise(r => setTimeout(r, 5));
+    const [, targetOrigin] = postMock.mock.calls.at(-1)!;
+    expect(targetOrigin).toBe('https://pinned.example');
+    setTrustedOrigins([]);
+    void p;
+  });
+
+  it('detectExtension uses TRUSTED_ORIGINS[0] when set', async () => {
+    const { setTrustedOrigins } = mod;
+    setTrustedOrigins(['https://pinned.example']);
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    postMock.mockImplementation((data: unknown) => {
+      const msg = data as { method?: string };
+      if (msg?.method === 'pdc.ping') {
+        setTimeout(() => {
+          fakeWindow.dispatchWithOrigin({ pdcExtension: true, method: 'pdc.ping' }, 'https://pinned.example');
+        }, 0);
+      }
+    });
+    const detected = await mod.ExtensionBridge.detectExtension();
+    expect(detected).toBe(true);
+    setTrustedOrigins([]);
+  });
+});
+
+describe('origin security — default target origin branch', () => {
+  beforeEach(async () => {
+    installFakeWindow();
+    vi.resetModules();
+    mod = await import('../src/extension/extension-bridge');
+  });
+  afterEach(() => {
+    removeFakeWindow();
+    vi.restoreAllMocks();
+  });
+
+  it('sendMessage falls back to location.origin when TRUSTED_ORIGINS empty', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const p = bridge.getAddress();
+    await new Promise(r => setTimeout(r, 5));
+    const [, targetOrigin] = postMock.mock.calls.at(-1)!;
+    expect(targetOrigin).toBe('https://test.local'); // == window.location.origin
+    void p;
+  });
+
+  it('detectExtension falls back to location.origin when TRUSTED_ORIGINS empty', async () => {
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    postMock.mockImplementation((data: unknown) => {
+      const msg = data as { method?: string };
+      if (msg?.method === 'pdc.ping') {
+        setTimeout(() => {
+          fakeWindow.dispatchWithOrigin({ pdcExtension: true, method: 'pdc.ping' }, 'https://test.local');
+        }, 0);
+      }
+    });
+    await mod.ExtensionBridge.detectExtension();
+    const [, targetOrigin] = postMock.mock.calls.at(-1)!;
+    expect(targetOrigin).toBe('https://test.local');
+  });
+});
+
+describe('origin security — empty TRUSTED_ORIGINS fallback', () => {
+  beforeEach(async () => {
+    installFakeWindow();
+    vi.resetModules();
+    mod = await import('../src/extension/extension-bridge');
+  });
+  afterEach(() => {
+    removeFakeWindow();
+    vi.restoreAllMocks();
+  });
+
+  it('sendMessage uses location.origin when TRUSTED_ORIGINS is empty', async () => {
+    const { setTrustedOrigins } = mod;
+    setTrustedOrigins([]); // empty → ?? falls back to location.origin
+    const bridge = new mod.ExtensionBridge();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const p = bridge.getAddress();
+    await new Promise(r => setTimeout(r, 5));
+    const [, targetOrigin] = postMock.mock.calls.at(-1)!;
+    expect(targetOrigin).toBe('https://test.local');
+    void p;
+  });
+
+  it('detectExtension uses location.origin when TRUSTED_ORIGINS is empty', async () => {
+    const { setTrustedOrigins } = mod;
+    setTrustedOrigins([]);
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    postMock.mockImplementation((data: unknown) => {
+      const msg = data as { method?: string };
+      if (msg?.method === 'pdc.ping') {
+        setTimeout(() => {
+          fakeWindow.dispatchWithOrigin({ pdcExtension: true, method: 'pdc.ping' }, 'https://test.local');
+        }, 0);
+      }
+    });
+    await mod.ExtensionBridge.detectExtension();
+    const [, targetOrigin] = postMock.mock.calls.at(-1)!;
+    expect(targetOrigin).toBe('https://test.local');
   });
 });

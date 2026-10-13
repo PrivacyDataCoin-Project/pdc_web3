@@ -161,15 +161,20 @@ export function reverseHexBytes(hex: string): string {
  * Generate random hex string (for testing)
  */
 export function randomHex(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  } else {
-    // Fallback for non-browser environments
-    for (let i = 0; i < byteLength; i++) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
+  if (byteLength < 0) {
+    throw new Error('randomHex: byteLength must be >= 0');
   }
+  const bytes = new Uint8Array(byteLength);
+  // Security: require a CSPRNG. crypto.getRandomValues is available in all
+  // browsers and Node.js >= 15 (global WebCrypto). Never fall back to
+  // Math.random() — predictable "random" values are a vulnerability.
+  if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
+    throw new Error(
+      'randomHex: no CSPRNG available (crypto.getRandomValues missing). ' +
+        'Use Node.js >= 15 or a browser with WebCrypto.'
+    );
+  }
+  crypto.getRandomValues(bytes);
   return bytesToHex(bytes);
 }
 

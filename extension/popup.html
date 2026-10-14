@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PDC Companion</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      width: 340px; margin: 0; padding: 0;
+      background: #05060d; color: #f4f6ff;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 0.9rem;
+    }
+    header {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.9rem 1rem;
+      background: linear-gradient(180deg, #07091a, #05060d);
+      border-bottom: 1px solid #ffffff1a;
+    }
+    header img { height: 26px; }
+    header strong { color: #3bc7ff; font-size: 1rem; }
+    header .ver { margin-left: auto; color: #b7bdd6; font-size: 0.7rem; }
+    main { padding: 1rem; }
+    .card {
+      background: #10132b; border: 1px solid #ffffff1a;
+      border-radius: 0.6rem; padding: 0.85rem; margin-bottom: 0.75rem;
+    }
+    .label { color: #b7bdd6; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .value { font-size: 0.8rem; word-break: break-all; margin-top: 0.25rem; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 0.4rem; }
+    .up { background: #3ee0a0; box-shadow: 0 0 8px #3ee0a0; }
+    .down { background: #e21e80; }
+    .wait { background: #f0c14a; }
+    button {
+      width: 100%; padding: 0.6rem; border: none; border-radius: 0.45rem;
+      background: #1e30f3; color: #f4f6ff; font-weight: 600; cursor: pointer;
+      font-size: 0.85rem;
+    }
+    button:hover { background: #2a3dff; }
+    footer { padding: 0.5rem 1rem 0.9rem; color: #b7bdd6; font-size: 0.65rem; text-align: center; }
+    a { color: #3bc7ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="PDC" />
+    <strong>PDC Companion</strong>
+    <span class="ver" id="ver"></span>
+  </header>
+  <main>
+    <div class="card">
+      <div class="label">Wallet</div>
+      <div class="value" id="status"><span class="dot wait"></span>Connecting to wallet…</div>
+    </div>
+    <div class="card" id="addrCard" style="display:none">
+      <div class="label">Address</div>
+      <div class="value" id="addr"></div>
+    </div>
+    <div class="card" id="balCard" style="display:none">
+      <div class="label">Balance (unlocked)</div>
+      <div class="value" id="bal"></div>
+    </div>
+    <button id="openOptions">Settings</button>
+  </main>
+  <footer>
+    <a href="https://privacydatacoin.com" target="_blank" rel="noopener">privacydatacoin.com</a>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

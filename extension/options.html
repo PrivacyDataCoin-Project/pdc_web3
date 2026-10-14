@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PDC Companion — Settings</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      background: #05060d; color: #f4f6ff;
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 640px; margin: 2rem auto; padding: 0 1.5rem;
+    }
+    h1 { color: #3bc7ff; font-size: 1.4rem; display: flex; align-items: center; gap: 0.6rem; }
+    h1 img { height: 30px; }
+    .card {
+      background: #10132b; border: 1px solid #ffffff1a;
+      border-radius: 0.6rem; padding: 1.1rem; margin-bottom: 1rem;
+    }
+    label { display: block; color: #b7bdd6; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0.8rem 0 0.3rem; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 0.55rem 0.7rem;
+      background: #05060d; color: #f4f6ff;
+      border: 1px solid #ffffff29; border-radius: 0.45rem; font-size: 0.9rem;
+    }
+    input:focus { outline: none; border-color: #3bc7ff; }
+    .hint { color: #b7bdd6; font-size: 0.75rem; margin-top: 0.3rem; }
+    button {
+      margin-top: 1rem; padding: 0.6rem 1.4rem; border: none; border-radius: 0.45rem;
+      background: #1e30f3; color: #f4f6ff; font-weight: 600; cursor: pointer;
+    }
+    button:hover { background: #2a3dff; }
+    #saved { color: #3ee0a0; margin-left: 0.8rem; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; }
+    #saved.show { opacity: 1; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #ffffff1a; word-break: break-all; }
+    .remove { color: #e21e80; cursor: pointer; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1><img src="icons/icon48.png" alt="PDC" /> PDC Companion — Settings</h1>
+
+  <div class="card">
+    <h2 style="font-size:1rem;color:#3bc7ff;margin:0 0 0.4rem">Wallet RPC</h2>
+    <label for="rpcUrl">RPC endpoint</label>
+    <input id="rpcUrl" placeholder="http://127.0.0.1:19212/json_rpc" />
+    <div class="hint">Local simplewallet HTTP RPC. Keep it bound to 127.0.0.1 — never expose it to the network.</div>
+
+    <label for="rpcLogin">RPC login (optional)</label>
+    <input id="rpcLogin" autocomplete="off" />
+
+    <label for="rpcPassword">RPC password (optional)</label>
+    <input id="rpcPassword" type="password" autocomplete="off" />
+
+    <button id="save">Save</button><span id="saved">Saved ✓</span>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:1rem;color:#3bc7ff;margin:0 0 0.4rem">Approved dApps</h2>
+    <div class="hint" style="margin:0 0 0.6rem">Only approved origins may call balance, transfer and swap methods. Read-only info methods work everywhere.</div>
+    <table id="origins"></table>
+    <label for="newOrigin">Add origin</label>
+    <input id="newOrigin" placeholder="https://trade.privacydatacoin.com" />
+    <button id="addOrigin">Approve</button>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

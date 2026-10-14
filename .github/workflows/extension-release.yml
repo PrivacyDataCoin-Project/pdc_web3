@@ -1,0 +1,79 @@
+name: Extension Release
+
+# Packs the PDC Companion MV3 extension and attaches it to a GitHub Release.
+# Trigger: push a tag extension-v* (e.g. extension-v0.1.0), or manual run.
+
+on:
+  push:
+    tags:
+      - 'extension-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ext-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate manifest
+        run: |
+          node -e "
+            const m = require('./extension/manifest.json');
+            if (m.manifest_version !== 3) throw new Error('manifest_version must be 3');
+            for (const f of [m.background.service_worker, m.action.default_popup,
+                             ...m.content_scripts.flatMap(c => c.js)])
+              if (!require('fs').existsSync('extension/' + f)) throw new Error('missing file: ' + f);
+            console.log('manifest OK —', m.name, m.version);
+          "
+
+      - name: Pack Chrome/Edge/Brave zip
+        run: |
+          cd extension
+          zip -r ../pdc-companion-${{ github.ref_name }}.zip . \
+            -x '*.md' -x 'icons/src/*'
+          cd ..
+          unzip -l pdc-companion-${{ github.ref_name }}.zip
+
+      - name: Pack Firefox source zip (for AMO / temporary load)
+        run: |
+          cd extension
+          zip -r ../pdc-companion-${{ github.ref_name }}-firefox-src.zip . \
+            -x 'icons/src/*'
+          cd ..
+
+      - name: Generate checksums
+        run: |
+          sha256sum pdc-companion-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: PDC Companion ${{ github.ref_name }}
+          body_path: extension/RELEASE_NOTES.md
+          files: |
+            pdc-companion-${{ github.ref_name }}.zip
+            pdc-companion-${{ github.ref_name }}-firefox-src.zip
+            SHA256SUMS.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Upload artifact (manual runs)
+        if: github.ref_name == github.sha || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdc-companion-build
+          path: |
+            pdc-companion-*.zip
+            SHA256SUMS.txt
+          retention-days: 14

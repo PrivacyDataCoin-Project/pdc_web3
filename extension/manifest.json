@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "PDC Companion",
+  "short_name": "PDC",
+  "version": "0.1.0",
+  "description": "PrivacyDataCoin wallet companion \u2014 connect dApps to your PDC wallet, sign Ionic Swap proposals, manage native assets.",
+  "author": "ArqTras <biuro@ar-net.info>",
+  "homepage_url": "https://privacydatacoin.com",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "PDC Companion",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "inpage.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inpage.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:19212/*",
+    "http://localhost:19212/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "minimum_chrome_version": "110"
+}

@@ -1,5 +1,12 @@
 # PDC Companion release notes
 
+## 0.1.4
+
+- Popup shows the **configured** RPC host:port (no more hardcoded “19212”).
+- Clearer errors for HTTP 401 / unreachable; options hint: use simplewallet
+  `19212`, not Qt GUI Companion JWT port `19211`.
+- Settings: Test connection button; host permissions for all localhost ports.
+
 ## 0.1.3
 
 - Fix stuck “Generating…”: stringify `BigInt` before `chrome.runtime.sendMessage`

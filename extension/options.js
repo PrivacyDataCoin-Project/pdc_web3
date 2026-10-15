@@ -52,14 +52,44 @@ function renderOrigins(origins) {
 }
 
 $('save').addEventListener('click', async () => {
+  const rpcUrl = $('rpcUrl').value.trim() || 'http://127.0.0.1:19212/json_rpc';
   await chrome.storage.local.set({
-    rpcUrl: $('rpcUrl').value.trim() || 'http://127.0.0.1:19212/json_rpc',
+    rpcUrl,
     rpcLogin: $('rpcLogin').value.trim(),
     rpcPassword: $('rpcPassword').value,
   });
   const s = $('saved');
   s.classList.add('show');
   setTimeout(() => s.classList.remove('show'), 1500);
+  $('testResult').textContent = 'Saved endpoint: ' + rpcUrl;
+  $('testResult').style.color = '#3ee0a0';
+});
+
+$('test').addEventListener('click', async () => {
+  const rpcUrl = $('rpcUrl').value.trim() || 'http://127.0.0.1:19212/json_rpc';
+  // Persist first so the service worker uses the same URL
+  await chrome.storage.local.set({
+    rpcUrl,
+    rpcLogin: $('rpcLogin').value.trim(),
+    rpcPassword: $('rpcPassword').value,
+  });
+  const out = $('testResult');
+  out.style.color = '#b7bdd6';
+  out.textContent = 'Testing ' + rpcUrl + ' …';
+  try {
+    const res = await chrome.runtime.sendMessage({
+      pdcExtension: true,
+      id: Date.now(),
+      method: 'pdc.getWalletInfo',
+    });
+    if (res?.error) throw new Error(res.error.message);
+    out.style.color = '#3ee0a0';
+    out.textContent =
+      'OK → ' + rpcUrl + ' · ' + (res.result?.address?.slice(0, 18) || '') + '…';
+  } catch (e) {
+    out.style.color = '#e21e80';
+    out.textContent = (e?.message || String(e)) + ' (endpoint: ' + rpcUrl + ')';
+  }
 });
 
 $('addOrigin').addEventListener('click', async () => {

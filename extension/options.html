@@ -43,15 +43,24 @@
     <h2 style="font-size:1rem;color:#3bc7ff;margin:0 0 0.4rem">Wallet RPC</h2>
     <label for="rpcUrl">RPC endpoint</label>
     <input id="rpcUrl" placeholder="http://127.0.0.1:19212/json_rpc" />
-    <div class="hint">Local simplewallet HTTP RPC. Keep it bound to 127.0.0.1 — never expose it to the network.</div>
+    <div class="hint">
+      Use <strong>simplewallet</strong> HTTP RPC, default
+      <code>http://127.0.0.1:19212/json_rpc</code>.
+      Do <strong>not</strong> use the Qt GUI “Companion” port <code>19211</code> —
+      that endpoint expects JWT (GUI Secret), which this extension does not speak yet.
+    </div>
 
     <label for="rpcLogin">RPC login (optional)</label>
     <input id="rpcLogin" autocomplete="off" />
 
     <label for="rpcPassword">RPC password (optional)</label>
     <input id="rpcPassword" type="password" autocomplete="off" />
+    <div class="hint">Only if you started simplewallet with <code>--rpc-login user:pass</code>. Not the GUI Companion Secret.</div>
 
-    <button id="save">Save</button><span id="saved">Saved ✓</span>
+    <button id="save" type="button">Save</button>
+    <button id="test" type="button" style="background:#10132b;border:1px solid #3bc7ff;margin-left:0.5rem">Test connection</button>
+    <span id="saved">Saved ✓</span>
+    <div id="testResult" class="hint" style="margin-top:0.6rem"></div>
   </div>
 
   <div class="card">

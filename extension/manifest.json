@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PDC Companion",
   "short_name": "PDC",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "PrivacyDataCoin wallet companion \u2014 connect dApps to your PDC wallet, sign Ionic Swap proposals, manage native assets.",
   "author": "ArqTras <biuro@ar-net.info>",
   "homepage_url": "https://privacydatacoin.com",
@@ -52,8 +52,8 @@
     "alarms"
   ],
   "host_permissions": [
-    "http://127.0.0.1:19212/*",
-    "http://localhost:19212/*"
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "options_ui": {
     "page": "options.html",

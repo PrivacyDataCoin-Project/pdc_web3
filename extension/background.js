@@ -15,7 +15,7 @@
 const DEFAULT_RPC = 'http://127.0.0.1:19212/json_rpc';
 
 /** Methods safe to call without explicit origin approval. */
-const SAFE_METHODS = new Set(['pdc.ping', 'pdc.getWalletInfo', 'pdc.getAddress']);
+const SAFE_METHODS = new Set(['pdc.ping', 'pdc.getWalletInfo', 'pdc.getAddress', 'pdc.getRpcConfig']);
 
 async function getConfig() {
   const { rpcUrl = DEFAULT_RPC, rpcLogin = '', rpcPassword = '', approvedOrigins = [] } =
@@ -28,15 +28,30 @@ let messageId = 0;
 async function walletRpc(method, params) {
   const { rpcUrl, rpcLogin, rpcPassword } = await getConfig();
   const headers = { 'Content-Type': 'application/json' };
-  if (rpcLogin) {
-    headers['Authorization'] = 'Basic ' + btoa(rpcLogin + ':' + rpcPassword);
+  // Basic auth when login and/or password set (simplewallet --rpc-login user:pass)
+  if (rpcLogin || rpcPassword) {
+    headers['Authorization'] = 'Basic ' + btoa(`${rpcLogin}:${rpcPassword}`);
   }
-  const res = await fetch(rpcUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ jsonrpc: '2.0', id: ++messageId, method, params: params ?? {} }),
-  });
-  if (!res.ok) throw rpcError(-32002, `wallet RPC HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: ++messageId, method, params: params ?? {} }),
+    });
+  } catch (e) {
+    throw rpcError(
+      -32002,
+      `cannot reach ${rpcUrl} (${e?.message || 'network error'}) — is simplewallet RPC running?`
+    );
+  }
+  if (!res.ok) {
+    const hint =
+      res.status === 401
+        ? ' — wrong RPC login/password, or this port expects JWT (GUI Companion on 19211). Use simplewallet on 19212.'
+        : '';
+    throw rpcError(-32002, `wallet RPC HTTP ${res.status} at ${rpcUrl}${hint}`);
+  }
   const body = await res.json();
   if (body.error) throw rpcError(-32003, body.error.message ?? 'wallet RPC error', body.error);
   return body.result;
@@ -66,6 +81,12 @@ async function handle(method, params, origin) {
   switch (method) {
     case 'pdc.ping':
       return { pong: true, version: chrome.runtime.getManifest().version };
+
+    case 'pdc.getRpcConfig': {
+      // Popup / options — show the endpoint actually in use (never expose password)
+      const { rpcUrl, rpcLogin } = await getConfig();
+      return { rpcUrl, rpcLogin: rpcLogin || null, hasPassword: Boolean((await getConfig()).rpcPassword) };
+    }
 
     case 'pdc.getWalletInfo': {
       // PDC simplewallet uses get_wallet_info / getaddress (not Zano get_status / get_address)

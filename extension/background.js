@@ -50,26 +50,37 @@ function isHex64(s) {
   return typeof s === 'string' && /^[0-9a-f]{64}$/i.test(s);
 }
 
+function isExtensionOrigin(origin) {
+  return (
+    typeof origin === 'string' &&
+    (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://'))
+  );
+}
+
 async function handle(method, params, origin) {
   const { approvedOrigins } = await getConfig();
-  const approved = SAFE_METHODS.has(method) || approvedOrigins.includes(origin);
+  // Popup / options pages are always trusted; dApps need explicit approval.
+  const approved =
+    SAFE_METHODS.has(method) || approvedOrigins.includes(origin) || isExtensionOrigin(origin);
 
   switch (method) {
     case 'pdc.ping':
       return { pong: true, version: chrome.runtime.getManifest().version };
 
     case 'pdc.getWalletInfo': {
-      const [status, addressRes] = await Promise.all([walletRpc('get_status'), walletRpc('get_address')]);
+      // PDC simplewallet uses get_wallet_info / getaddress (not Zano get_status / get_address)
+      const info = await walletRpc('get_wallet_info');
       return {
-        address: addressRes.address,
-        network: status.nettype ?? 'mainnet',
+        address: info.address,
+        network: info.nettype ?? 'mainnet',
+        height: info.current_height,
         isConnected: true,
         version: chrome.runtime.getManifest().version,
       };
     }
 
     case 'pdc.getAddress': {
-      const r = await walletRpc('get_address');
+      const r = await walletRpc('getaddress');
       return { address: r.address };
     }
 
@@ -77,23 +88,29 @@ async function handle(method, params, origin) {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
       const assetId = params?.asset_id;
       if (assetId && !isHex64(assetId)) throw rpcError(-32602, 'asset_id must be a 64-char hex asset id');
-      const r = await walletRpc('get_balance', assetId ? { asset_id: assetId } : {});
+      const r = await walletRpc('getbalance', assetId ? { asset_id: assetId } : {});
+      const unlocked = r.unlocked_balance ?? r.unlocked ?? r.total_unlocked ?? 0;
+      const total = r.balance ?? r.total ?? unlocked;
+      const locked = BigInt(String(total)) - BigInt(String(unlocked));
       return {
-        unlocked: String(r.unlocked ?? r.total_unlocked ?? 0),
-        locked: String(r.locked ?? r.total_locked ?? 0),
+        unlocked: String(unlocked),
+        locked: String(locked < 0n ? 0n : locked),
       };
     }
 
     case 'pdc.getAssets': {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
-      const r = await walletRpc('get_assets');
-      const assets = Object.entries(r ?? {}).map(([asset_id, info]) => ({
-        asset_id,
-        name: info?.name ?? '',
-        ticker: info?.ticker ?? '',
-        decimal_point: info?.decimal_point ?? 12,
+      // No get_assets RPC — derive from getbalance.balances[].asset_info
+      const r = await walletRpc('getbalance', {});
+      const list = Array.isArray(r.balances) ? r.balances : [];
+      return list.map((b) => ({
+        asset_id: b.asset_info?.asset_id ?? '',
+        name: b.asset_info?.full_name ?? b.asset_info?.name ?? '',
+        ticker: b.asset_info?.ticker ?? '',
+        decimal_point: b.asset_info?.decimal_point ?? 12,
+        unlocked: String(b.unlocked ?? 0),
+        locked: String(BigInt(String(b.total ?? 0)) - BigInt(String(b.unlocked ?? 0))),
       }));
-      return assets;
     }
 
     case 'pdc.transfer': {
@@ -109,27 +126,42 @@ async function handle(method, params, origin) {
 
     case 'pdc.createSwapProposal': {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
+      // PDC RPC shape: { proposal: { to_finalizer, to_initiator, fee_paid_by_a }, destination_address }
+      // (flat fields leave fee=0 → API_RETURN_CODE_WALLET_FEE_TOO_LOW)
+      const proposalIn = params.proposal ?? params;
+      const dest = params.destination_address ?? proposalIn.destination_address;
+      if (!dest) throw rpcError(-32602, 'destination_address required');
       const r = await walletRpc('ionic_swap_generate_proposal', {
-        to_finalizer: (params.to_finalizer ?? []).map((i) => ({ asset_id: i.asset_id, amount: String(i.amount) })),
-        to_initiator: (params.to_initiator ?? []).map((i) => ({ asset_id: i.asset_id, amount: String(i.amount) })),
-        fee_paid_by_a: String(params.fee_paid_by_a ?? 0),
-        expiration_time: params.expiration_time,
-        destination_address: params.destination_address,
+        proposal: {
+          to_finalizer: (proposalIn.to_finalizer ?? []).map((i) => ({
+            asset_id: i.asset_id,
+            amount: String(i.amount),
+          })),
+          to_initiator: (proposalIn.to_initiator ?? []).map((i) => ({
+            asset_id: i.asset_id,
+            amount: String(i.amount),
+          })),
+          fee_paid_by_a: String(proposalIn.fee_paid_by_a ?? 10000000000),
+        },
+        destination_address: dest,
       });
       return { hex_raw_proposal: r.hex_raw_proposal ?? r.raw_proposal };
     }
 
     case 'pdc.getSwapProposalInfo': {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
-      if (!isHex64(params?.hex_raw_proposal) && typeof params?.hex_raw_proposal !== 'string')
+      if (typeof params?.hex_raw_proposal !== 'string' || params.hex_raw_proposal.length < 20)
         throw rpcError(-32602, 'hex_raw_proposal required');
-      const r = await walletRpc('ionic_swap_get_proposal_info', { hex_raw_proposal: params.hex_raw_proposal });
+      const r = await walletRpc('ionic_swap_get_proposal_info', {
+        hex_raw_proposal: params.hex_raw_proposal,
+      });
+      const p = r.proposal ?? r;
       return {
-        to_finalizer: r.to_finalizer,
-        to_initiator: r.to_initiator,
-        fee_paid_by_a: r.fee_paid_by_a,
-        expiration_time: r.expiration_time,
-        proposer_address: r.proposer_address,
+        to_finalizer: p.to_finalizer,
+        to_initiator: p.to_initiator,
+        fee_paid_by_a: p.fee_paid_by_a,
+        expiration_time: p.expiration_time,
+        proposer_address: p.proposer_address,
       };
     }
 
@@ -166,5 +198,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // Keep-alive for MV3 service worker longevity during active sessions.
 chrome.alarms?.create('pdc-keepalive', { periodInMinutes: 4 });
 chrome.alarms?.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'pdc-keepalive') void walletRpc('get_status').catch(() => {});
+  if (alarm.name === 'pdc-keepalive') void walletRpc('getaddress').catch(() => {});
 });

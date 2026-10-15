@@ -1,40 +1,76 @@
 /**
- * PDC Companion — content script.
+ * PDC Companion — content script (isolated world).
  *
- * Bridges between the inpage script (page context) and the background
- * service worker:
- *   inpage (page ctx) --window.postMessage--> here (isolated ctx)
- *   here --chrome.runtime.sendMessage--> background (service worker)
- *
- * Background events are pushed to all tabs and re-posted into the page.
+ * 1. Injects inpage.js into the PAGE world (window.pdcExtension).
+ * 2. Relays page postMessage ↔ background service worker.
  */
 (() => {
   'use strict';
 
-  // Relay page -> background
+  // Inject page-world bridge
+  try {
+    const s = document.documentElement
+      ? document.documentElement
+      : document.head || document.documentElement;
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('inpage.js');
+    script.async = false;
+    (document.documentElement || document.head).appendChild(script);
+    script.remove();
+  } catch {
+    /* document not ready — rare at document_start */
+  }
+
+  // Page -> background
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     const msg = event.data;
-    if (!msg || msg.pdcExtension !== true) return;
-    if (msg.source === 'pdc-inpage') return; // our own echoes
+    if (!msg || msg.pdcExtension !== true || !msg.method) return;
+    // Only relay frames tagged from inpage (ignore echoes / other scripts)
+    if (msg.source !== 'pdc-inpage') return;
 
-    if (msg.method) {
-      chrome.runtime.sendMessage({ pdcExtension: true, ...msg }).catch(() => {
-        // Service worker unavailable — report as internal error.
-        window.postMessage(
-          { pdcExtension: true, id: msg.id, error: { message: 'PDC Companion: extension context unavailable', code: -32001 } },
-          window.location.origin
-        );
-      });
+    try {
+      chrome.runtime.sendMessage(
+        { pdcExtension: true, id: msg.id, method: msg.method, params: msg.params },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage(
+              {
+                pdcExtension: true,
+                id: msg.id,
+                error: {
+                  message: chrome.runtime.lastError.message || 'extension context unavailable',
+                  code: -32001,
+                },
+              },
+              window.location.origin
+            );
+            return;
+          }
+          if (response) {
+            window.postMessage({ ...response }, window.location.origin);
+          }
+        }
+      );
+    } catch (e) {
+      // e.g. BigInt in params → "Do not know how to serialize a BigInt"
+      window.postMessage(
+        {
+          pdcExtension: true,
+          id: msg.id,
+          error: { message: e?.message || String(e), code: -32603 },
+        },
+        window.location.origin
+      );
     }
   });
 
-  // Relay background events -> page
+  // Background push events -> page
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg || msg.pdcExtension !== true || !msg.event) return;
-    window.postMessage({ pdcExtension: true, event: msg.event, data: msg.data }, window.location.origin);
+    window.postMessage(
+      { pdcExtension: true, event: msg.event, data: msg.data },
+      window.location.origin
+    );
   });
-
-  // Let the page know the extension is installed (ping/pong handshake).
-  window.postMessage({ pdcExtension: true, method: 'pdc.ping', source: 'pdc-content' }, window.location.origin);
 })();

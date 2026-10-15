@@ -33,7 +33,11 @@ function send(method, params) {
       document.getElementById('balCard').style.display = 'block';
     }
   } catch (e) {
-    statusEl.innerHTML = '<span class="dot down"></span>Wallet offline — start simplewallet with RPC on 19212';
+    const detail = e?.message ? String(e.message).slice(0, 80) : 'unreachable';
+    statusEl.innerHTML =
+      '<span class="dot down"></span>Wallet offline (' +
+      detail +
+      ') — check simplewallet RPC on 19212';
   }
   document.getElementById('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
 })();

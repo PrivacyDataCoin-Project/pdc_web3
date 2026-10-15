@@ -12,7 +12,9 @@ protocol compatible with [`@privacydatacoin/pdc_web3`](../README.md)
   `pdcExtension` postMessage protocol (ping/pong handshake, JSON-RPC style
   request/response, push events).
 - **Wallet RPC relay** — talks to local `simplewallet` HTTP RPC
-  (default `http://127.0.0.1:19212/json_rpc`). Credentials stay local.
+  (default `http://127.0.0.1:19212/json_rpc`) using PDC method names
+  (`getaddress`, `getbalance`, `get_wallet_info`, `ionic_swap_*`).
+  Credentials stay local.
 - **Origin pinning** — only explicitly approved dApp origins may call
   balance / transfer / swap methods. Read-only info methods (`pdc.ping`,
   `pdc.getWalletInfo`, `pdc.getAddress`) work everywhere.

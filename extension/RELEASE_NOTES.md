@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.5
+
+- **Qt GUI Companion (port 19211):** JWT auth via `Pdc-Access-Token`
+  (HS256 + `body_hash` / `salt` / `exp`) — paste Secret from Pdc Settings.
+- Preset buttons for GUI 19211 vs simplewallet 19212; dedicated JWT secret field.
+
 ## 0.1.4
 
 - Popup shows the **configured** RPC host:port (no more hardcoded “19212”).

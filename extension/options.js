@@ -11,11 +11,23 @@ function validOrigin(s) {
 }
 
 async function load() {
-  const { rpcUrl = 'http://127.0.0.1:19212/json_rpc', rpcLogin = '', rpcPassword = '', approvedOrigins = [] } =
-    await chrome.storage.local.get(['rpcUrl', 'rpcLogin', 'rpcPassword', 'approvedOrigins']);
+  const {
+    rpcUrl = 'http://127.0.0.1:19212/json_rpc',
+    rpcLogin = '',
+    rpcPassword = '',
+    jwtSecret = '',
+    approvedOrigins = [],
+  } = await chrome.storage.local.get([
+    'rpcUrl',
+    'rpcLogin',
+    'rpcPassword',
+    'jwtSecret',
+    'approvedOrigins',
+  ]);
   $('rpcUrl').value = rpcUrl;
   $('rpcLogin').value = rpcLogin;
   $('rpcPassword').value = rpcPassword;
+  $('jwtSecret').value = jwtSecret;
   renderOrigins(approvedOrigins);
 }
 
@@ -51,28 +63,40 @@ function renderOrigins(origins) {
   }
 }
 
-$('save').addEventListener('click', async () => {
+async function persist() {
   const rpcUrl = $('rpcUrl').value.trim() || 'http://127.0.0.1:19212/json_rpc';
   await chrome.storage.local.set({
     rpcUrl,
     rpcLogin: $('rpcLogin').value.trim(),
     rpcPassword: $('rpcPassword').value,
+    jwtSecret: $('jwtSecret').value,
   });
+  return rpcUrl;
+}
+
+$('presetGui').addEventListener('click', () => {
+  $('rpcUrl').value = 'http://127.0.0.1:19211/json_rpc';
+  $('rpcLogin').value = '';
+  $('rpcPassword').value = '';
+});
+
+$('presetSw').addEventListener('click', () => {
+  $('rpcUrl').value = 'http://127.0.0.1:19212/json_rpc';
+  $('jwtSecret').value = '';
+});
+
+$('save').addEventListener('click', async () => {
+  const rpcUrl = await persist();
   const s = $('saved');
   s.classList.add('show');
   setTimeout(() => s.classList.remove('show'), 1500);
-  $('testResult').textContent = 'Saved endpoint: ' + rpcUrl;
   $('testResult').style.color = '#3ee0a0';
+  const mode = $('jwtSecret').value.trim() ? 'JWT (GUI)' : 'Basic/none';
+  $('testResult').textContent = `Saved ${rpcUrl} · auth ${mode}`;
 });
 
 $('test').addEventListener('click', async () => {
-  const rpcUrl = $('rpcUrl').value.trim() || 'http://127.0.0.1:19212/json_rpc';
-  // Persist first so the service worker uses the same URL
-  await chrome.storage.local.set({
-    rpcUrl,
-    rpcLogin: $('rpcLogin').value.trim(),
-    rpcPassword: $('rpcPassword').value,
-  });
+  const rpcUrl = await persist();
   const out = $('testResult');
   out.style.color = '#b7bdd6';
   out.textContent = 'Testing ' + rpcUrl + ' …';
@@ -85,7 +109,7 @@ $('test').addEventListener('click', async () => {
     if (res?.error) throw new Error(res.error.message);
     out.style.color = '#3ee0a0';
     out.textContent =
-      'OK → ' + rpcUrl + ' · ' + (res.result?.address?.slice(0, 18) || '') + '…';
+      'OK → ' + rpcUrl + ' · ' + (res.result?.address?.slice(0, 20) || '') + '…';
   } catch (e) {
     out.style.color = '#e21e80';
     out.textContent = (e?.message || String(e)) + ' (endpoint: ' + rpcUrl + ')';

@@ -17,23 +17,29 @@
       border-radius: 0.6rem; padding: 1.1rem; margin-bottom: 1rem;
     }
     label { display: block; color: #b7bdd6; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0.8rem 0 0.3rem; }
-    input {
+    input, select {
       width: 100%; box-sizing: border-box; padding: 0.55rem 0.7rem;
       background: #05060d; color: #f4f6ff;
       border: 1px solid #ffffff29; border-radius: 0.45rem; font-size: 0.9rem;
     }
-    input:focus { outline: none; border-color: #3bc7ff; }
-    .hint { color: #b7bdd6; font-size: 0.75rem; margin-top: 0.3rem; }
+    input:focus, select:focus { outline: none; border-color: #3bc7ff; }
+    .hint { color: #b7bdd6; font-size: 0.75rem; margin-top: 0.3rem; line-height: 1.45; }
+    code { color: #3bc7ff; font-size: 0.85em; }
     button {
       margin-top: 1rem; padding: 0.6rem 1.4rem; border: none; border-radius: 0.45rem;
       background: #1e30f3; color: #f4f6ff; font-weight: 600; cursor: pointer;
     }
     button:hover { background: #2a3dff; }
+    button.secondary {
+      background: #10132b; border: 1px solid #3bc7ff; margin-left: 0.5rem;
+    }
     #saved { color: #3ee0a0; margin-left: 0.8rem; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; }
     #saved.show { opacity: 1; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #ffffff1a; word-break: break-all; }
     .remove { color: #e21e80; cursor: pointer; font-weight: 700; }
+    .preset { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .preset button { margin-top: 0; padding: 0.35rem 0.7rem; font-size: 0.75rem; background: #1a1d35; border: 1px solid #ffffff29; }
   </style>
 </head>
 <body>
@@ -41,24 +47,31 @@
 
   <div class="card">
     <h2 style="font-size:1rem;color:#3bc7ff;margin:0 0 0.4rem">Wallet RPC</h2>
+
     <label for="rpcUrl">RPC endpoint</label>
-    <input id="rpcUrl" placeholder="http://127.0.0.1:19212/json_rpc" />
+    <input id="rpcUrl" placeholder="http://127.0.0.1:19211/json_rpc" />
+    <div class="preset">
+      <button type="button" id="presetGui">Qt GUI Companion · 19211</button>
+      <button type="button" id="presetSw">simplewallet · 19212</button>
+    </div>
     <div class="hint">
-      Use <strong>simplewallet</strong> HTTP RPC, default
-      <code>http://127.0.0.1:19212/json_rpc</code>.
-      Do <strong>not</strong> use the Qt GUI “Companion” port <code>19211</code> —
-      that endpoint expects JWT (GUI Secret), which this extension does not speak yet.
+      <strong>Qt GUI:</strong> Settings → Pdc Companion ON → copy Secret → paste below.
+      RPC = <code>http://127.0.0.1:19211/json_rpc</code> (JWT).<br/>
+      <strong>simplewallet:</strong> <code>--rpc-bind-port 19212</code> (optional Basic login).
     </div>
 
-    <label for="rpcLogin">RPC login (optional)</label>
+    <label for="jwtSecret">JWT secret (Qt GUI Companion Secret)</label>
+    <input id="jwtSecret" type="password" autocomplete="off" placeholder="Paste Secret from Pdc GUI" />
+    <div class="hint">Sent as <code>Pdc-Access-Token</code> (HS256 + body hash). Required for port 19211.</div>
+
+    <label for="rpcLogin">RPC login (simplewallet only, optional)</label>
     <input id="rpcLogin" autocomplete="off" />
 
-    <label for="rpcPassword">RPC password (optional)</label>
+    <label for="rpcPassword">RPC password (simplewallet Basic auth, optional)</label>
     <input id="rpcPassword" type="password" autocomplete="off" />
-    <div class="hint">Only if you started simplewallet with <code>--rpc-login user:pass</code>. Not the GUI Companion Secret.</div>
 
     <button id="save" type="button">Save</button>
-    <button id="test" type="button" style="background:#10132b;border:1px solid #3bc7ff;margin-left:0.5rem">Test connection</button>
+    <button id="test" type="button" class="secondary">Test connection</button>
     <span id="saved">Saved ✓</span>
     <div id="testResult" class="hint" style="margin-top:0.6rem"></div>
   </div>

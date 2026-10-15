@@ -41,6 +41,8 @@ jobs:
           zip -r ../pdc-companion-${{ github.ref_name }}.zip . \
             -x '*.md' -x 'icons/src/*'
           cd ..
+          # Stable name for /releases/latest/download/… (Trade always uses latest)
+          cp "pdc-companion-${{ github.ref_name }}.zip" pdc-companion-extension-latest.zip
           unzip -l pdc-companion-${{ github.ref_name }}.zip
 
       - name: Pack Firefox source zip (for AMO / temporary load)
@@ -49,6 +51,8 @@ jobs:
           zip -r ../pdc-companion-${{ github.ref_name }}-firefox-src.zip . \
             -x 'icons/src/*'
           cd ..
+          cp "pdc-companion-${{ github.ref_name }}-firefox-src.zip" \
+            pdc-companion-extension-latest-firefox-src.zip
 
       - name: Generate checksums
         run: |
@@ -64,9 +68,13 @@ jobs:
           files: |
             pdc-companion-${{ github.ref_name }}.zip
             pdc-companion-${{ github.ref_name }}-firefox-src.zip
+            pdc-companion-extension-latest.zip
+            pdc-companion-extension-latest-firefox-src.zip
             SHA256SUMS.txt
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Tags are extension-vX.Y.Z — only mark rc/beta/alpha as prerelease
+          # so GitHub /releases/latest can resolve stable Companion builds.
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
 
       - name: Upload artifact (manual runs)
         if: github.ref_name == github.sha || github.event_name == 'workflow_dispatch'

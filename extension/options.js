@@ -10,20 +10,30 @@ function validOrigin(s) {
   }
 }
 
+const DEFAULT_APPROVED = ['https://trade.privacydatacoin.com'];
+
+async function ensureTradeApproved() {
+  const { approvedOrigins = [] } = await chrome.storage.local.get('approvedOrigins');
+  const list = Array.isArray(approvedOrigins) ? [...approvedOrigins] : [];
+  let changed = false;
+  for (const o of DEFAULT_APPROVED) {
+    if (!list.includes(o)) {
+      list.push(o);
+      changed = true;
+    }
+  }
+  if (changed) await chrome.storage.local.set({ approvedOrigins: list });
+  return list;
+}
+
 async function load() {
+  const approvedOrigins = await ensureTradeApproved();
   const {
     rpcUrl = 'http://127.0.0.1:19212/json_rpc',
     rpcLogin = '',
     rpcPassword = '',
     jwtSecret = '',
-    approvedOrigins = [],
-  } = await chrome.storage.local.get([
-    'rpcUrl',
-    'rpcLogin',
-    'rpcPassword',
-    'jwtSecret',
-    'approvedOrigins',
-  ]);
+  } = await chrome.storage.local.get(['rpcUrl', 'rpcLogin', 'rpcPassword', 'jwtSecret']);
   $('rpcUrl').value = rpcUrl;
   $('rpcLogin').value = rpcLogin;
   $('rpcPassword').value = rpcPassword;

@@ -16,10 +16,29 @@ const DEFAULT_RPC = 'http://127.0.0.1:19212/json_rpc';
 /** HTTP header expected by wallet_rpc_server (ZANO_ACCESS_TOKEN → Pdc-Access-Token). */
 const PDC_ACCESS_TOKEN = 'Pdc-Access-Token';
 
+/** Always pre-approved so Trade works without a manual Settings step. */
+const DEFAULT_APPROVED_ORIGINS = ['https://trade.privacydatacoin.com'];
+
 /** Methods safe to call without explicit origin approval. */
 const SAFE_METHODS = new Set(['pdc.ping', 'pdc.getWalletInfo', 'pdc.getAddress', 'pdc.getRpcConfig']);
 
+/** Ensure default dApps are in approvedOrigins (idempotent). */
+async function ensureDefaultApprovedOrigins() {
+  const { approvedOrigins = [] } = await chrome.storage.local.get('approvedOrigins');
+  const list = Array.isArray(approvedOrigins) ? [...approvedOrigins] : [];
+  let changed = false;
+  for (const origin of DEFAULT_APPROVED_ORIGINS) {
+    if (!list.includes(origin)) {
+      list.push(origin);
+      changed = true;
+    }
+  }
+  if (changed) await chrome.storage.local.set({ approvedOrigins: list });
+  return list;
+}
+
 async function getConfig() {
+  await ensureDefaultApprovedOrigins();
   const {
     rpcUrl = DEFAULT_RPC,
     rpcLogin = '',
@@ -306,6 +325,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   })();
   return true; // async sendResponse
 });
+
+// Seed Trade as approved on install / update / SW start.
+chrome.runtime.onInstalled.addListener(() => {
+  void ensureDefaultApprovedOrigins();
+});
+void ensureDefaultApprovedOrigins();
 
 // Keep-alive for MV3 service worker longevity during active sessions.
 chrome.alarms?.create('pdc-keepalive', { periodInMinutes: 4 });

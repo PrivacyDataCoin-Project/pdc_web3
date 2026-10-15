@@ -1,5 +1,10 @@
 # PDC Companion release notes
 
+## 0.1.6
+
+- Auto-approve `https://trade.privacydatacoin.com` in Approved dApps
+  (install, update, and on first RPC config read).
+
 ## 0.1.5
 
 - **Qt GUI Companion (port 19211):** JWT auth via `Pdc-Access-Token`

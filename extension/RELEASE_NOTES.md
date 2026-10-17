@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.7
+
+- Multi-wallet: popup shows an **Active wallet** dropdown when the Qt GUI
+  has more than one wallet open (`mw_get_wallets` / `mw_select_wallet`).
+- Switching the dropdown updates which wallet Companion / dApps use.
+
 ## 0.1.6
 
 - Auto-approve `https://trade.privacydatacoin.com` in Approved dApps

@@ -23,6 +23,10 @@ protocol compatible with [`@privacydatacoin/pdc_web3`](../README.md)
   (`ionic_swap_generate_proposal`, `ionic_swap_get_proposal_info`,
   `ionic_swap_accept_proposal`).
 - **Popup UI** — wallet status, address, unlocked balance (explorer dark theme).
+- **Multi-wallet** — when connected to the Qt GUI Companion (port 19211) with
+  several wallets open, the popup can switch the active wallet
+  (`mw_get_wallets` / `mw_select_wallet`). The GUI also syncs the sidebar
+  selection to Companion automatically.
 - **Options page** — RPC endpoint/credentials management + approved dApps list.
 
 ## Security model

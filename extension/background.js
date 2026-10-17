@@ -20,7 +20,13 @@ const PDC_ACCESS_TOKEN = 'Pdc-Access-Token';
 const DEFAULT_APPROVED_ORIGINS = ['https://trade.privacydatacoin.com'];
 
 /** Methods safe to call without explicit origin approval. */
-const SAFE_METHODS = new Set(['pdc.ping', 'pdc.getWalletInfo', 'pdc.getAddress', 'pdc.getRpcConfig']);
+const SAFE_METHODS = new Set([
+  'pdc.ping',
+  'pdc.getWalletInfo',
+  'pdc.getAddress',
+  'pdc.getRpcConfig',
+  'pdc.getWallets',
+]);
 
 /** Ensure default dApps are in approvedOrigins (idempotent). */
 async function ensureDefaultApprovedOrigins() {
@@ -213,6 +219,51 @@ async function handle(method, params, origin) {
     case 'pdc.getAddress': {
       const r = await walletRpc('getaddress');
       return { address: r.address };
+    }
+
+    case 'pdc.getWallets': {
+      // Multi-wallet API (Qt GUI Companion). simplewallet may return a single entry or error.
+      try {
+        const r = await walletRpc('mw_get_wallets');
+        const wallets = Array.isArray(r?.wallets) ? r.wallets : [];
+        return {
+          wallets: wallets.map((w) => {
+            const path = w.wi?.path ?? w.path ?? '';
+            const fromPath = path.split(/[/\\]/).filter(Boolean).pop() || '';
+            return {
+              wallet_id: w.wallet_id,
+              address: w.wi?.address ?? w.address ?? '',
+              name: w.wi?.name ?? w.name ?? fromPath,
+            };
+          }),
+        };
+      } catch (e) {
+        // Fallback: expose the currently active wallet only.
+        const info = await walletRpc('get_wallet_info');
+        const addr = await walletRpc('getaddress');
+        return {
+          wallets: [
+            {
+              wallet_id: 0,
+              address: addr.address ?? info.address ?? '',
+              name: info.name ?? '',
+            },
+          ],
+        };
+      }
+    }
+
+    case 'pdc.selectWallet': {
+      // Popup / options only — switching active wallet for Companion RPC.
+      if (!isExtensionOrigin(origin)) {
+        throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
+      }
+      const walletId = params?.wallet_id;
+      if (walletId === undefined || walletId === null || Number.isNaN(Number(walletId))) {
+        throw rpcError(-32602, 'wallet_id required');
+      }
+      await walletRpc('mw_select_wallet', { wallet_id: Number(walletId) });
+      return { ok: true, wallet_id: Number(walletId) };
     }
 
     case 'pdc.getBalance': {

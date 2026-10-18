@@ -496,6 +496,14 @@ async function handle(method, params, origin) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'PDC_COMPANION_RELOAD') {
+    try {
+      chrome.runtime.reload();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   if (!msg || msg.pdcExtension !== true || !msg.method) return;
   const origin = sender.origin ?? sender.url ?? 'unknown';
   (async () => {

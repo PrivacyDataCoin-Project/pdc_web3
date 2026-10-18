@@ -1,5 +1,17 @@
 # PDC Companion release notes
 
+## 0.1.12
+
+- **Trade one-click Replace:** Trade banner **Replace extension** writes the
+  published zip into the unpacked Companion folder (not zip-only download).
+- After replace, Trade asks the content script to `chrome.runtime.reload()` so
+  the new build loads without a manual Reload when possible.
+- Silent auto-apply on Trade when the folder handle permission remains granted.
+
+## 0.1.11
+
+- Bridge for Trade-driven reload after file replace (`PDC_COMPANION_RELOAD`).
+
 ## 0.1.10
 
 - **One-click Update:** popup **Update** downloads the published zip and, via

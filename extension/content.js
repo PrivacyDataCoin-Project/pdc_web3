@@ -21,6 +21,22 @@
     /* document not ready — rare at document_start */
   }
 
+  // Trade site → reload after one-click file replace (unpacked install).
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const data = event.data;
+    if (data && data.type === 'PDC_COMPANION_REQUEST_RELOAD') {
+      try {
+        chrome.runtime.sendMessage({ type: 'PDC_COMPANION_RELOAD' }, () => {
+          void chrome.runtime.lastError;
+        });
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+  });
+
   // Page -> background
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;

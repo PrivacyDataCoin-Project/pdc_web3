@@ -16,6 +16,23 @@ const DEFAULT_RPC = 'http://127.0.0.1:19212/json_rpc';
 /** HTTP header expected by wallet_rpc_server (ZANO_ACCESS_TOKEN → Pdc-Access-Token). */
 const PDC_ACCESS_TOKEN = 'Pdc-Access-Token';
 
+/** Native PDC + known Trade whitelist CAs (decimals/ticker fallback if RPC omits them). */
+const NATIVE_ASSET_ID =
+  'd6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a';
+const KNOWN_ASSETS = {
+  [NATIVE_ASSET_ID]: {
+    ticker: 'PDC',
+    name: 'PrivacyDataCoin (Native)',
+    decimal_point: 12,
+  },
+  // Wrapped Bitcoin CA — keep in sync with Trade/backend BTCX_ASSET_ID.
+  c2bf0410873b49ec7e7dd19d62bca9625d80cd3123670a67b48d997d3127426d: {
+    ticker: 'BTCX',
+    name: 'Wrapped Bitcoin (BTCX)',
+    decimal_point: 8,
+  },
+};
+
 /** Always pre-approved so Trade works without a manual Settings step. */
 const DEFAULT_APPROVED_ORIGINS = ['https://trade.privacydatacoin.com'];
 
@@ -183,6 +200,130 @@ function isExtensionOrigin(origin) {
   );
 }
 
+function normalizeAssetId(id) {
+  return typeof id === 'string' ? id.toLowerCase() : '';
+}
+
+function knownMeta(assetId) {
+  return KNOWN_ASSETS[normalizeAssetId(assetId)] ?? null;
+}
+
+function lockedFrom(total, unlocked) {
+  try {
+    const locked = BigInt(String(total ?? 0)) - BigInt(String(unlocked ?? 0));
+    return String(locked < 0n ? 0n : locked);
+  } catch {
+    return '0';
+  }
+}
+
+/**
+ * Build popup/dApp asset list: unlocked balances for native PDC + whitelisted CAs.
+ * Prefer wallet getbalance.balances[]; merge assets_whitelist_get for zero-balance entries
+ * and ticker/decimals; fall back to hardcoded Trade CA metadata (BTCX @ 8 dp, PDC @ 12).
+ */
+async function collectWhitelistedBalances() {
+  const byId = new Map();
+
+  const upsert = (rawId, partial) => {
+    const assetId = normalizeAssetId(rawId);
+    if (!assetId || !isHex64(assetId)) return;
+    const known = knownMeta(assetId);
+    const prev = byId.get(assetId);
+    const ticker =
+      (partial.ticker && String(partial.ticker).trim()) ||
+      prev?.ticker ||
+      known?.ticker ||
+      assetId.slice(0, 6).toUpperCase();
+    const name =
+      (partial.name && String(partial.name).trim()) ||
+      prev?.name ||
+      known?.name ||
+      ticker;
+    const decimalRaw = partial.decimal_point ?? prev?.decimal_point ?? known?.decimal_point ?? 12;
+    const decimal_point = Number(decimalRaw);
+    const unlocked =
+      partial.unlocked !== undefined
+        ? String(partial.unlocked)
+        : prev?.unlocked !== undefined
+          ? prev.unlocked
+          : '0';
+    const locked =
+      partial.locked !== undefined
+        ? String(partial.locked)
+        : prev?.locked !== undefined
+          ? prev.locked
+          : '0';
+    byId.set(assetId, {
+      asset_id: assetId,
+      name,
+      ticker,
+      decimal_point: Number.isFinite(decimal_point) ? decimal_point : 12,
+      unlocked,
+      locked,
+    });
+  };
+
+  const r = await walletRpc('getbalance', {});
+  const list = Array.isArray(r.balances) ? r.balances : [];
+  for (const b of list) {
+    const assetId = b.asset_info?.asset_id ?? '';
+    const unlocked = b.unlocked ?? 0;
+    upsert(assetId, {
+      name: b.asset_info?.full_name ?? b.asset_info?.name ?? '',
+      ticker: b.asset_info?.ticker ?? '',
+      decimal_point: b.asset_info?.decimal_point,
+      unlocked: String(unlocked),
+      locked: lockedFrom(b.total ?? 0, unlocked),
+    });
+  }
+
+  // Native top-level fields when balances[] omitted native entry.
+  if (!byId.has(NATIVE_ASSET_ID)) {
+    const unlocked = r.unlocked_balance ?? r.unlocked ?? r.total_unlocked ?? 0;
+    const total = r.balance ?? r.total ?? unlocked;
+    upsert(NATIVE_ASSET_ID, {
+      unlocked: String(unlocked),
+      locked: lockedFrom(total, unlocked),
+    });
+  }
+
+  try {
+    const wl = await walletRpc('assets_whitelist_get', {});
+    const pools = [
+      ...(Array.isArray(wl?.local_whitelist) ? wl.local_whitelist : []),
+      ...(Array.isArray(wl?.global_whitelist) ? wl.global_whitelist : []),
+      ...(Array.isArray(wl?.own_assets) ? wl.own_assets : []),
+    ];
+    for (const a of pools) {
+      const assetId = a?.asset_id ?? '';
+      const key = normalizeAssetId(assetId);
+      const prev = key ? byId.get(key) : null;
+      upsert(assetId, {
+        name: a?.full_name ?? a?.name ?? '',
+        ticker: a?.ticker ?? '',
+        decimal_point: a?.decimal_point,
+        // Keep balance from getbalance; whitelist-only entries show 0 unlocked.
+        unlocked: prev?.unlocked ?? '0',
+        locked: prev?.locked ?? '0',
+      });
+    }
+  } catch {
+    // Whitelist RPC optional — getbalance alone covers active whitelisted balances.
+  }
+
+  // If wallet returned no CA rows but BTCX is a known Trade whitelist id, do not invent
+  // a zero row — getbalance already lists only whitelisted assets when present.
+
+  const assets = [...byId.values()];
+  assets.sort((a, b) => {
+    if (a.asset_id === NATIVE_ASSET_ID) return -1;
+    if (b.asset_id === NATIVE_ASSET_ID) return 1;
+    return String(a.ticker).localeCompare(String(b.ticker));
+  });
+  return assets;
+}
+
 async function handle(method, params, origin) {
   const { approvedOrigins } = await getConfig();
   // Popup / options pages are always trusted; dApps need explicit approval.
@@ -282,17 +423,8 @@ async function handle(method, params, origin) {
 
     case 'pdc.getAssets': {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
-      // No get_assets RPC — derive from getbalance.balances[].asset_info
-      const r = await walletRpc('getbalance', {});
-      const list = Array.isArray(r.balances) ? r.balances : [];
-      return list.map((b) => ({
-        asset_id: b.asset_info?.asset_id ?? '',
-        name: b.asset_info?.full_name ?? b.asset_info?.name ?? '',
-        ticker: b.asset_info?.ticker ?? '',
-        decimal_point: b.asset_info?.decimal_point ?? 12,
-        unlocked: String(b.unlocked ?? 0),
-        locked: String(BigInt(String(b.total ?? 0)) - BigInt(String(b.unlocked ?? 0))),
-      }));
+      // getbalance returns native + all whitelisted CA balances; enrich from assets_whitelist_get.
+      return collectWhitelistedBalances();
     }
 
     case 'pdc.transfer': {

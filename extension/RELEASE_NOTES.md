@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.8
+
+- Popup **Balance (unlocked)** lists native PDC plus every whitelisted CA
+  (e.g. BTCX) from wallet `getbalance` / `assets_whitelist_get`, with correct
+  decimals (PDC 12, BTCX 8).
+
 ## 0.1.7
 
 - Multi-wallet: popup shows an **Active wallet** dropdown when the Qt GUI

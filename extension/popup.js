@@ -1,16 +1,22 @@
-/** PDC Companion — popup logic: wallet status, address, balance, multi-wallet pick. */
-const PDC_DECIMALS = 12;
+/** PDC Companion — popup logic: wallet status, address, multi-asset balance, multi-wallet pick. */
 const DEFAULT_RPC = 'http://127.0.0.1:19212/json_rpc';
+const NATIVE_ASSET_ID =
+  'd6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a';
 
-function atomicToHuman(v) {
+/** Decimals fallback when RPC omits decimal_point (PDC 12, BTCX 8). */
+const DECIMALS_BY_ID = {
+  [NATIVE_ASSET_ID]: 12,
+  c2bf0410873b49ec7e7dd19d62bca9625d80cd3123670a67b48d997d3127426d: 8,
+};
+
+function atomicToHuman(v, decimals) {
+  const dp = Number.isFinite(Number(decimals)) ? Number(decimals) : 12;
   try {
     const n = BigInt(v);
     if (n === 0n) return '0';
-    const whole = n / 10n ** BigInt(PDC_DECIMALS);
-    const frac = (n % 10n ** BigInt(PDC_DECIMALS))
-      .toString()
-      .padStart(PDC_DECIMALS, '0')
-      .replace(/0+$/, '');
+    const scale = 10n ** BigInt(dp);
+    const whole = n / scale;
+    const frac = (n % scale).toString().padStart(dp, '0').replace(/0+$/, '');
     return whole.toString() + (frac ? `.${frac}` : '');
   } catch {
     return '0';
@@ -35,16 +41,61 @@ function shortAddr(addr) {
   return addr.slice(0, 8) + '…' + addr.slice(-6);
 }
 
+function decimalsFor(asset) {
+  const id = String(asset?.asset_id ?? '').toLowerCase();
+  if (Number.isFinite(Number(asset?.decimal_point))) return Number(asset.decimal_point);
+  if (DECIMALS_BY_ID[id] !== undefined) return DECIMALS_BY_ID[id];
+  return 12;
+}
+
+function renderBalances(assets) {
+  const balEl = document.getElementById('bal');
+  balEl.replaceChildren();
+  if (!Array.isArray(assets) || assets.length === 0) {
+    balEl.textContent = '—';
+    return;
+  }
+  for (const a of assets) {
+    const row = document.createElement('div');
+    row.className = 'bal-row';
+    const amt = document.createElement('span');
+    amt.className = 'bal-amt';
+    amt.textContent = atomicToHuman(a.unlocked, decimalsFor(a));
+    const tick = document.createElement('span');
+    tick.className = 'bal-ticker';
+    tick.textContent = a.ticker || '???';
+    tick.title = a.name || a.asset_id || '';
+    row.appendChild(amt);
+    row.appendChild(tick);
+    balEl.appendChild(row);
+  }
+}
+
 async function refreshBalanceAndAddress() {
   const info = await send('pdc.getWalletInfo');
   if (info?.error) throw new Error(info.error.message);
   const addr = info.result.address;
   document.getElementById('addr').textContent = addr;
   document.getElementById('addrCard').style.display = 'block';
-  const bal = await send('pdc.getBalance', {});
-  if (!bal?.error) {
-    document.getElementById('bal').textContent = atomicToHuman(bal.result.unlocked) + ' PDC';
+
+  const assetsRes = await send('pdc.getAssets', {});
+  if (!assetsRes?.error && Array.isArray(assetsRes.result) && assetsRes.result.length) {
+    renderBalances(assetsRes.result);
     document.getElementById('balCard').style.display = 'block';
+  } else {
+    // Fallback: native-only getBalance (older SW / RPC without balances[]).
+    const bal = await send('pdc.getBalance', {});
+    if (!bal?.error) {
+      renderBalances([
+        {
+          asset_id: NATIVE_ASSET_ID,
+          ticker: 'PDC',
+          decimal_point: 12,
+          unlocked: bal.result.unlocked,
+        },
+      ]);
+      document.getElementById('balCard').style.display = 'block';
+    }
   }
   return info.result;
 }

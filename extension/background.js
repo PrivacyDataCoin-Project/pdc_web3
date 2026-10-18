@@ -404,7 +404,25 @@ async function handle(method, params, origin) {
         throw rpcError(-32602, 'wallet_id required');
       }
       await walletRpc('mw_select_wallet', { wallet_id: Number(walletId) });
-      return { ok: true, wallet_id: Number(walletId) };
+      // Notify open dApp tabs (via storage → content.js → postMessage accountsChanged).
+      let address = '';
+      try {
+        const info = await walletRpc('get_wallet_info');
+        address = info?.address ?? '';
+        if (!address) {
+          const a = await walletRpc('getaddress');
+          address = a?.address ?? '';
+        }
+      } catch {
+        /* best-effort */
+      }
+      if (address) {
+        await chrome.storage.local.set({
+          pdcActiveAddress: address,
+          pdcActiveAddressTs: Date.now(),
+        });
+      }
+      return { ok: true, wallet_id: Number(walletId), address };
     }
 
     case 'pdc.getBalance': {

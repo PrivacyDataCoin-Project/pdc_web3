@@ -89,4 +89,15 @@
       window.location.origin
     );
   });
+
+  // Wallet switch in popup writes pdcActiveAddress — relay as accountsChanged (no tabs permission).
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.pdcActiveAddress) return;
+    const next = changes.pdcActiveAddress.newValue;
+    if (!next || typeof next !== 'string') return;
+    window.postMessage(
+      { pdcExtension: true, event: 'accountsChanged', data: [next] },
+      window.location.origin
+    );
+  });
 })();

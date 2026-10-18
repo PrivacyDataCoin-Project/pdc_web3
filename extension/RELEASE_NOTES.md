@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.13
+
+- **Wallet switch → dApps:** after popup Active wallet change, Companion
+  publishes `accountsChanged` so Trade re-reads the active address (Take with
+  a second wallet no longer stuck on the maker JWT identity).
+
 ## 0.1.12
 
 - **Trade one-click Replace:** Trade banner **Replace extension** writes the

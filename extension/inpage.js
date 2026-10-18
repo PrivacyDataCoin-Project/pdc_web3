@@ -92,10 +92,26 @@
       return call('pdc.getBalance', params);
     },
     signMessage(message) {
+      // Wallet RPC expects { buff: base64 }. Accept raw string or { buff }.
+      let params;
+      if (typeof message === 'string') {
+        const bytes = new TextEncoder().encode(message);
+        let binary = '';
+        for (const b of bytes) binary += String.fromCharCode(b);
+        params = { buff: btoa(binary) };
+      } else if (message && typeof message === 'object' && message.buff) {
+        params = { buff: message.buff };
+      } else {
+        params = message;
+      }
       return call('pdc.callWalletRpc', {
         method: 'sign_message',
-        params: typeof message === 'string' ? { message } : message,
-      }).then((r) => ({ signature: r?.sig ?? r?.signature ?? String(r ?? '') }));
+        params,
+      }).then((r) => ({
+        signature: r?.sig ?? r?.signature ?? String(r ?? ''),
+        // Spend public key hex — Trade auth must forward this as `pkey`.
+        pkey: r?.pkey ?? '',
+      }));
     },
     createSwapProposal(params) {
       return call('pdc.createSwapProposal', params);

@@ -185,7 +185,7 @@ async function checkForUpdate() {
   }
 
   textEl.textContent =
-    `Installed v${installed} · latest v${latestMeta.version}. Press Update to replace the unpacked folder (pick it once), then the extension reloads.`;
+    `Installed v${installed} · latest v${latestMeta.version}. Press Update (pick unpacked folder once) — files replace and extension reloads. Or use Update on Trade.`;
   banner.style.display = 'block';
 
   if (applyBtn && updater?.applyCompanionUpdate) {

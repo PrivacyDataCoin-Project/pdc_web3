@@ -1,5 +1,13 @@
 # PDC Companion release notes
 
+## 0.1.10
+
+- **One-click Update:** popup **Update** downloads the published zip and, via
+  the File System Access picker, writes it into the unpacked install folder,
+  then reloads the extension. The folder is remembered for silent auto-apply
+  on later versions when permission remains granted.
+- Fallback: **Download zip** if the picker is unavailable or cancelled.
+
 ## 0.1.9
 
 - **Update check:** popup compares the installed manifest version with the

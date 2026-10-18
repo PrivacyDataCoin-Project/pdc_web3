@@ -74,7 +74,9 @@ const { hex_raw_proposal } = await bridge.createSwapProposal({ /* ... */ });
 4. Tag `extension-vX.Y.Z` for the GitHub zip assets used by the download proxy.
 
 The popup (and Trade) compare the installed manifest version against that
-published signal and show an update banner when older.
+published signal and show an update banner when older. In the popup, **Update**
+best-effort replaces the unpacked folder (File System Access) and reloads;
+later updates can auto-apply when that folder permission is still granted.
 
 ## Build & release
 

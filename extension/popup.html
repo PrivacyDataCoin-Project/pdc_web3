@@ -60,9 +60,15 @@
     .update-banner .actions {
       display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.55rem; align-items: center;
     }
-    .update-banner a.btn {
+    .update-banner a.btn,
+    .update-banner button.apply {
       display: inline-block; padding: 0.35rem 0.7rem; border-radius: 0.35rem;
       background: #1e30f3; color: #f4f6ff; font-weight: 600; font-size: 0.75rem;
+      border: none; cursor: pointer; width: auto;
+    }
+    .update-banner button.apply:disabled { opacity: 0.6; cursor: wait; }
+    .update-banner a.secondary {
+      color: #3bc7ff; font-size: 0.72rem; text-decoration: underline;
     }
     .update-banner button.dismiss {
       background: transparent; border: 1px solid #ffffff33; color: #b7bdd6;
@@ -81,7 +87,8 @@
     <strong>Update available</strong>
     <span id="updateText"></span>
     <div class="actions">
-      <a class="btn" id="updateDownload" href="https://trade.privacydatacoin.com/api/companion/download" target="_blank" rel="noopener">Download update</a>
+      <button type="button" class="apply" id="updateApply">Update</button>
+      <a class="secondary" id="updateDownload" href="https://trade.privacydatacoin.com/api/companion/download" target="_blank" rel="noopener">Download zip</a>
       <button type="button" class="dismiss" id="updateDismiss">Dismiss</button>
     </div>
   </div>
@@ -107,6 +114,7 @@
   <footer>
     <a href="https://privacydatacoin.com" target="_blank" rel="noopener">privacydatacoin.com</a>
   </footer>
+  <script src="update-apply.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

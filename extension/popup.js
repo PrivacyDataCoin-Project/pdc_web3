@@ -141,6 +141,7 @@ async function checkForUpdate() {
   const banner = document.getElementById('updateBanner');
   const textEl = document.getElementById('updateText');
   const dl = document.getElementById('updateDownload');
+  const applyBtn = document.getElementById('updateApply');
   const dismissBtn = document.getElementById('updateDismiss');
   if (!banner || !textEl || !dl) return;
 
@@ -159,15 +160,63 @@ async function checkForUpdate() {
     return;
   }
 
-  textEl.textContent = `Installed v${installed} · latest v${latestMeta.version}. Reload the unpacked folder or reinstall from the zip after download.`;
-  dl.href =
+  let zipUrl =
     latestMeta.downloadUrl ||
     latestMeta.zipUrl ||
     'https://trade.privacydatacoin.com/api/companion/download';
-  if (dl.href.startsWith('/')) {
-    dl.href = `https://trade.privacydatacoin.com${dl.href}`;
+  if (zipUrl.startsWith('/')) {
+    zipUrl = `https://trade.privacydatacoin.com${zipUrl}`;
   }
+  dl.href = zipUrl;
+
+  const setStatus = (msg) => {
+    textEl.textContent = msg;
+  };
+
+  // Best-effort silent replace when the unpacked folder was remembered earlier.
+  const updater = window.PdcCompanionUpdate;
+  if (updater?.tryAutoApplyUpdate) {
+    try {
+      const applied = await updater.tryAutoApplyUpdate(zipUrl, setStatus);
+      if (applied) return;
+    } catch {
+      /* show banner + manual Update */
+    }
+  }
+
+  textEl.textContent =
+    `Installed v${installed} · latest v${latestMeta.version}. Press Update to replace the unpacked folder (pick it once), then the extension reloads.`;
   banner.style.display = 'block';
+
+  if (applyBtn && updater?.applyCompanionUpdate) {
+    applyBtn.onclick = async () => {
+      applyBtn.disabled = true;
+      try {
+        const result = await updater.applyCompanionUpdate({
+          zipUrl,
+          allowPrompt: true,
+          onStatus: setStatus,
+        });
+        if (result === 'downloaded') {
+          setStatus(
+            `Downloaded v${latestMeta.version}. Replace your unpacked folder contents, then click Reload on chrome://extensions.`
+          );
+        } else if (result === 'cancelled') {
+          setStatus(
+            `Installed v${installed} · latest v${latestMeta.version}. Update cancelled — press Update again or use Download zip.`
+          );
+        }
+      } catch (e) {
+        setStatus(`Update failed: ${e?.message || e}. Try Download zip.`);
+      } finally {
+        applyBtn.disabled = false;
+      }
+    };
+  } else if (applyBtn) {
+    applyBtn.onclick = () => {
+      window.open(zipUrl, '_blank', 'noopener');
+    };
+  }
 
   dismissBtn?.addEventListener(
     'click',

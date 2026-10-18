@@ -499,8 +499,32 @@ async function handle(method, params, origin) {
 
     case 'pdc.acceptSwapProposal': {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
-      const r = await walletRpc('ionic_swap_accept_proposal', { hex_raw_proposal: params.hex_raw_proposal });
-      return { result_tx_id: r.result_tx_id ?? r.tx_id };
+      const hex = params?.hex_raw_proposal;
+      if (typeof hex !== 'string' || hex.length < 20) {
+        throw rpcError(-32602, 'hex_raw_proposal required');
+      }
+      let r;
+      try {
+        r = await walletRpc('ionic_swap_accept_proposal', { hex_raw_proposal: hex });
+      } catch (err) {
+        const msg = err?.message || String(err);
+        // Wallet GUI crash / RPC drop during accept used to surface as a bare network error.
+        if (/Failed to fetch|NetworkError|cannot reach|HTTP 401|ECONNRESET/i.test(msg)) {
+          throw rpcError(
+            err.code ?? -32002,
+            `${msg} — unlock the Qt wallet, enable Companion (JWT secret matches Options), and use a build with the JWT salt mutex fix (v2.4.3.10+).`
+          );
+        }
+        throw err;
+      }
+      const txId = String(r?.result_tx_id ?? r?.tx_id ?? '').trim().toLowerCase();
+      if (!isHex64(txId)) {
+        throw rpcError(
+          -32003,
+          'ionic_swap_accept_proposal returned no 64-hex result_tx_id — check wallet RPC logs'
+        );
+      }
+      return { result_tx_id: txId };
     }
 
     case 'pdc.callWalletRpc': {

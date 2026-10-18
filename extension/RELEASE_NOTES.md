@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.14
+
+- **acceptSwapProposal:** require `hex_raw_proposal`, validate 64-hex
+  `result_tx_id`, and surface actionable errors when wallet RPC drops
+  (JWT/Companion GUI crash) instead of a bare network failure.
+
 ## 0.1.13
 
 - **Wallet switch → dApps:** after popup Active wallet change, Companion

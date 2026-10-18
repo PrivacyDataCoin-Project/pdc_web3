@@ -19,7 +19,8 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "docs": "typedoc --out docs src/index.ts"
+    "docs": "typedoc --out docs src/index.ts",
+    "sync:companion-latest": "node scripts/sync-companion-latest.mjs"
   },
   "keywords": [
     "privacydatacoin",

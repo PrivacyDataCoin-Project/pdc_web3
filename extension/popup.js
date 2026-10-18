@@ -100,6 +100,85 @@ async function refreshBalanceAndAddress() {
   return info.result;
 }
 
+/** Semver-ish compare: a < b → negative, equal → 0, a > b → positive. */
+function cmpVersion(a, b) {
+  const pa = String(a || '')
+    .replace(/^v/i, '')
+    .split(/[.+-]/)
+    .map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || '')
+    .replace(/^v/i, '')
+    .split(/[.+-]/)
+    .map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+const LATEST_URLS = [
+  'https://trade.privacydatacoin.com/companion/latest.json',
+  'https://trade.privacydatacoin.com/api/companion/info',
+];
+
+async function fetchLatestCompanion() {
+  for (const url of LATEST_URLS) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data?.version) return data;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
+async function checkForUpdate() {
+  const banner = document.getElementById('updateBanner');
+  const textEl = document.getElementById('updateText');
+  const dl = document.getElementById('updateDownload');
+  const dismissBtn = document.getElementById('updateDismiss');
+  if (!banner || !textEl || !dl) return;
+
+  const installed = chrome.runtime.getManifest().version;
+  let latestMeta;
+  try {
+    latestMeta = await fetchLatestCompanion();
+  } catch {
+    return;
+  }
+  if (!latestMeta?.version) return;
+  if (cmpVersion(installed, latestMeta.version) >= 0) return;
+
+  const { updateDismissedVersion } = await chrome.storage.local.get('updateDismissedVersion');
+  if (updateDismissedVersion && cmpVersion(updateDismissedVersion, latestMeta.version) >= 0) {
+    return;
+  }
+
+  textEl.textContent = `Installed v${installed} · latest v${latestMeta.version}. Reload the unpacked folder or reinstall from the zip after download.`;
+  dl.href =
+    latestMeta.downloadUrl ||
+    latestMeta.zipUrl ||
+    'https://trade.privacydatacoin.com/api/companion/download';
+  if (dl.href.startsWith('/')) {
+    dl.href = `https://trade.privacydatacoin.com${dl.href}`;
+  }
+  banner.style.display = 'block';
+
+  dismissBtn?.addEventListener(
+    'click',
+    () => {
+      void chrome.storage.local.set({ updateDismissedVersion: latestMeta.version });
+      banner.style.display = 'none';
+    },
+    { once: true }
+  );
+}
+
 async function loadWalletPicker(currentAddress) {
   const list = await send('pdc.getWallets');
   if (list?.error || !Array.isArray(list?.result?.wallets)) return;
@@ -147,6 +226,8 @@ async function loadWalletPicker(currentAddress) {
 (async () => {
   document.getElementById('ver').textContent = 'v' + chrome.runtime.getManifest().version;
   const statusEl = document.getElementById('status');
+
+  void checkForUpdate();
 
   let rpcUrl = DEFAULT_RPC;
   try {

@@ -64,6 +64,18 @@ const info = await bridge.connect({
 const { hex_raw_proposal } = await bridge.createSwapProposal({ /* ... */ });
 ```
 
+## Version / update signal
+
+1. Bump `extension/manifest.json` → `"version"`.
+2. Run `npm run sync:companion-latest` (writes `extension/latest.json`).
+3. Mirror that JSON to Trade FE `public/companion/latest.json` and deploy FE
+   so `https://trade.privacydatacoin.com/companion/latest.json` (and
+   `/api/companion/info`) advertise the new version.
+4. Tag `extension-vX.Y.Z` for the GitHub zip assets used by the download proxy.
+
+The popup (and Trade) compare the installed manifest version against that
+published signal and show an update banner when older.
+
 ## Build & release
 
 CI (`.github/workflows/extension-release.yml`) packs `extension/` into

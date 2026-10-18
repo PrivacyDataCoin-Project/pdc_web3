@@ -46,6 +46,29 @@
     button:hover { background: #2a3dff; }
     footer { padding: 0.5rem 1rem 0.9rem; color: #b7bdd6; font-size: 0.65rem; text-align: center; }
     a { color: #3bc7ff; text-decoration: none; }
+    .update-banner {
+      display: none;
+      margin: 0.75rem 1rem 0;
+      padding: 0.7rem 0.8rem;
+      border-radius: 0.55rem;
+      border: 1px solid #f0c14a66;
+      background: #f0c14a18;
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+    .update-banner strong { color: #f0c14a; display: block; margin-bottom: 0.2rem; }
+    .update-banner .actions {
+      display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.55rem; align-items: center;
+    }
+    .update-banner a.btn {
+      display: inline-block; padding: 0.35rem 0.7rem; border-radius: 0.35rem;
+      background: #1e30f3; color: #f4f6ff; font-weight: 600; font-size: 0.75rem;
+    }
+    .update-banner button.dismiss {
+      background: transparent; border: 1px solid #ffffff33; color: #b7bdd6;
+      padding: 0.3rem 0.55rem; border-radius: 0.35rem; font-size: 0.72rem;
+      cursor: pointer; width: auto;
+    }
   </style>
 </head>
 <body>
@@ -54,6 +77,14 @@
     <strong>PDC Companion</strong>
     <span class="ver" id="ver"></span>
   </header>
+  <div class="update-banner" id="updateBanner" role="status" aria-live="polite">
+    <strong>Update available</strong>
+    <span id="updateText"></span>
+    <div class="actions">
+      <a class="btn" id="updateDownload" href="https://trade.privacydatacoin.com/api/companion/download" target="_blank" rel="noopener">Download update</a>
+      <button type="button" class="dismiss" id="updateDismiss">Dismiss</button>
+    </div>
+  </div>
   <main>
     <div class="card">
       <div class="label">Wallet · RPC <span id="rpcLabel" style="text-transform:none;letter-spacing:0;color:#3bc7ff">…</span></div>

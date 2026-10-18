@@ -88,6 +88,13 @@
     getWalletInfo() {
       return call('pdc.getWalletInfo');
     },
+    /** Installed Companion extension version (manifest). Works offline. */
+    getVersion() {
+      return call('pdc.ping').then((r) => r?.version ?? null);
+    },
+    ping() {
+      return call('pdc.ping');
+    },
     getBalance(params) {
       return call('pdc.getBalance', params);
     },

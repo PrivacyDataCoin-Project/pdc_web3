@@ -1,5 +1,14 @@
 # PDC Companion release notes
 
+## 0.1.9
+
+- **Update check:** popup compares the installed manifest version with the
+  published latest signal (`trade.privacydatacoin.com/companion/latest.json`
+  and `/api/companion/info`). When older, shows a clear banner with a
+  download link.
+- Canonical latest metadata lives in `extension/latest.json` (kept in sync
+  with `manifest.json` via `npm run sync:companion-latest`).
+
 ## 0.1.8
 
 - Popup **Balance (unlocked)** lists native PDC plus every whitelisted CA

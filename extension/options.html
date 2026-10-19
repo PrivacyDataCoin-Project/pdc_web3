@@ -62,7 +62,11 @@
 
     <label for="jwtSecret">JWT secret (Qt GUI Companion Secret)</label>
     <input id="jwtSecret" type="password" autocomplete="off" placeholder="Paste Secret from Pdc GUI" />
-    <div class="hint">Sent as <code>Pdc-Access-Token</code> (HS256 + body hash). Required for port 19211.</div>
+    <div class="hint">
+      Sent as <code>Pdc-Access-Token</code> (HS256 + body hash). Required for port 19211.
+      For security the secret is cleared after <strong>10 minutes</strong> — regenerate in the
+      wallet and paste a new key when notified.
+    </div>
 
     <label for="rpcLogin">RPC login (simplewallet only, optional)</label>
     <input id="rpcLogin" autocomplete="off" />

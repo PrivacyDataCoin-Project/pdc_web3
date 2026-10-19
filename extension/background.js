@@ -107,6 +107,13 @@ async function sha256Hex(text) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** JWT exp claim lifetime (seconds). Keep below wallet salt anti-replay window (1h). */
+const JWT_EXP_SECONDS = 10 * 60;
+
+/** Force Companion JWT secret re-entry every N minutes (security rotation). */
+const JWT_SECRET_ROTATE_ALARM = 'pdc-jwt-secret-rotate';
+const JWT_SECRET_ROTATE_MINUTES = 10;
+
 /** HS256 JWT matching Zano Companion / docs.zano.org JWT guide. */
 async function createAccessToken(httpBody, secret) {
   const header = b64nopad(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
@@ -115,7 +122,7 @@ async function createAccessToken(httpBody, secret) {
       body_hash: await sha256Hex(httpBody),
       user: 'pdc_extension',
       salt: randomSalt(64),
-      exp: Math.floor(Date.now() / 1000) + 60,
+      exp: Math.floor(Date.now() / 1000) + JWT_EXP_SECONDS,
     })
   );
   const signingInput = `${header}.${payload}`;
@@ -559,14 +566,63 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // async sendResponse
 });
 
+async function scheduleJwtSecretRotation() {
+  if (!chrome.alarms?.create) return;
+  const { jwtSecret = '' } = (await chrome.storage.local.get('jwtSecret')) ?? {};
+  if (String(jwtSecret || '').trim()) {
+    await chrome.alarms.create(JWT_SECRET_ROTATE_ALARM, {
+      delayInMinutes: JWT_SECRET_ROTATE_MINUTES,
+    });
+  } else {
+    await chrome.alarms.clear(JWT_SECRET_ROTATE_ALARM);
+  }
+}
+
+/** Clear stored JWT secret and notify — user must paste a freshly regenerated Companion Secret. */
+async function rotateJwtSecretForSecurity() {
+  const { jwtSecret = '' } = (await chrome.storage.local.get('jwtSecret')) ?? {};
+  if (!String(jwtSecret || '').trim()) return;
+  await chrome.storage.local.set({
+    jwtSecret: '',
+    jwtSecretRotateRequired: true,
+    jwtSecretRotatedAt: Date.now(),
+  });
+  await chrome.alarms?.clear?.(JWT_SECRET_ROTATE_ALARM);
+  try {
+    await chrome.notifications?.create?.('pdc-jwt-secret-rotate', {
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: 'PDC Companion',
+      message:
+        'New Companion key required for security reasons. Regenerate the secret in Qt wallet Settings → Pdc Companion, then paste it into Options.',
+      priority: 2,
+      requireInteraction: true,
+    });
+  } catch {
+    /* notifications may be denied */
+  }
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.jwtSecret) return;
+  const next = changes.jwtSecret.newValue;
+  if (String(next || '').trim()) {
+    void chrome.storage.local.set({ jwtSecretRotateRequired: false });
+  }
+  void scheduleJwtSecretRotation();
+});
+
 // Seed Trade as approved on install / update / SW start.
 chrome.runtime.onInstalled.addListener(() => {
   void ensureDefaultApprovedOrigins();
+  void scheduleJwtSecretRotation();
 });
 void ensureDefaultApprovedOrigins();
+void scheduleJwtSecretRotation();
 
 // Keep-alive for MV3 service worker longevity during active sessions.
 chrome.alarms?.create('pdc-keepalive', { periodInMinutes: 4 });
 chrome.alarms?.onAlarm.addListener((alarm) => {
   if (alarm.name === 'pdc-keepalive') void walletRpc('getaddress').catch(() => {});
+  if (alarm.name === JWT_SECRET_ROTATE_ALARM) void rotateJwtSecretForSecurity();
 });

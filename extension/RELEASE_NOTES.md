@@ -1,5 +1,13 @@
 # PDC Companion release notes
 
+## 0.1.15
+
+- **JWT lifetime:** access-token `exp` is **10 minutes** (was 60s).
+- **Secret rotation:** 10 minutes after saving a Companion JWT secret, the
+  extension clears it and shows a system notification that a **new key is
+  required for security** — regenerate in Qt Settings → Pdc Companion and
+  paste into Options again.
+
 ## 0.1.14
 
 - **acceptSwapProposal:** require `hex_raw_proposal`, validate 64-hex

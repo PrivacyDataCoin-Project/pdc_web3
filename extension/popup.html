@@ -92,6 +92,14 @@
       <button type="button" class="dismiss" id="updateDismiss">Dismiss</button>
     </div>
   </div>
+  <div class="update-banner" id="secretRotateBanner" role="status" aria-live="polite" style="display:none;border-color:#e21e8044">
+    <strong>New key required</strong>
+    <span>Companion JWT secret cleared after 10 minutes for security. Regenerate in Qt wallet Settings and paste into Options.</span>
+    <div class="actions">
+      <button type="button" class="apply" id="secretRotateOpen">Open Settings</button>
+      <button type="button" class="dismiss" id="secretRotateDismiss">Dismiss</button>
+    </div>
+  </div>
   <main>
     <div class="card">
       <div class="label">Wallet · RPC <span id="rpcLabel" style="text-transform:none;letter-spacing:0;color:#3bc7ff">…</span></div>

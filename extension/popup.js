@@ -272,11 +272,30 @@ async function loadWalletPicker(currentAddress) {
   });
 }
 
+async function checkSecretRotationBanner() {
+  const banner = document.getElementById('secretRotateBanner');
+  const openBtn = document.getElementById('secretRotateOpen');
+  const dismiss = document.getElementById('secretRotateDismiss');
+  if (!banner) return;
+  const { jwtSecretRotateRequired } = await chrome.storage.local.get('jwtSecretRotateRequired');
+  if (!jwtSecretRotateRequired) {
+    banner.style.display = 'none';
+    return;
+  }
+  banner.style.display = 'block';
+  openBtn?.addEventListener('click', () => chrome.runtime.openOptionsPage());
+  dismiss?.addEventListener('click', async () => {
+    await chrome.storage.local.set({ jwtSecretRotateRequired: false });
+    banner.style.display = 'none';
+  });
+}
+
 (async () => {
   document.getElementById('ver').textContent = 'v' + chrome.runtime.getManifest().version;
   const statusEl = document.getElementById('status');
 
   void checkForUpdate();
+  void checkSecretRotationBanner();
 
   let rpcUrl = DEFAULT_RPC;
   try {

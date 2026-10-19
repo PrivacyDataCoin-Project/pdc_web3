@@ -75,11 +75,15 @@ function renderOrigins(origins) {
 
 async function persist() {
   const rpcUrl = $('rpcUrl').value.trim() || 'http://127.0.0.1:19212/json_rpc';
+  const jwtSecret = $('jwtSecret').value;
   await chrome.storage.local.set({
     rpcUrl,
     rpcLogin: $('rpcLogin').value.trim(),
     rpcPassword: $('rpcPassword').value,
-    jwtSecret: $('jwtSecret').value,
+    jwtSecret,
+    ...(String(jwtSecret || '').trim()
+      ? { jwtSecretRotateRequired: false }
+      : {}),
   });
   return rpcUrl;
 }

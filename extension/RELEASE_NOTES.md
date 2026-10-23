@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.16
+
+- **Update security:** auto-apply / download zip URLs must be `https` on
+  allowlisted hosts only (`trade.privacydatacoin.com`, `github.com`,
+  `objects.githubusercontent.com`). Arbitrary absolute `zipUrl` values are rejected.
+
 ## 0.1.15
 
 - **JWT lifetime:** access-token `exp` is **10 minutes** (was 60s).

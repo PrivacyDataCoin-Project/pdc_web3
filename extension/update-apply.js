@@ -203,9 +203,33 @@ async function resolveInstallDir({ allowPrompt }) {
   return pickCompanionDir();
 }
 
+const ALLOWED_UPDATE_HOSTS = new Set([
+  'trade.privacydatacoin.com',
+  'github.com',
+  'objects.githubusercontent.com',
+]);
+
 function absoluteDownloadUrl(url) {
   if (!url) return 'https://trade.privacydatacoin.com/api/companion/download';
   if (url.startsWith('/')) return `https://trade.privacydatacoin.com${url}`;
+  return url;
+}
+
+/** Reject absolute zip URLs outside the Companion update allowlist (SEC-004). */
+function assertAllowedZipUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Update zip URL is not a valid absolute URL');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Update zip URL must use https');
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (!ALLOWED_UPDATE_HOSTS.has(host)) {
+    throw new Error(`Update zip host not allowlisted: ${host}`);
+  }
   return url;
 }
 
@@ -214,7 +238,7 @@ function absoluteDownloadUrl(url) {
  * @returns {Promise<'reloading'|'downloaded'|'cancelled'>}
  */
 async function applyCompanionUpdate(opts) {
-  const zipUrl = absoluteDownloadUrl(opts.zipUrl);
+  const zipUrl = assertAllowedZipUrl(absoluteDownloadUrl(opts.zipUrl));
   const allowPrompt = opts.allowPrompt !== false;
   const onStatus = opts.onStatus || (() => {});
 
@@ -263,4 +287,6 @@ async function tryAutoApplyUpdate(zipUrl, onStatus) {
 window.PdcCompanionUpdate = {
   applyCompanionUpdate,
   tryAutoApplyUpdate,
+  assertAllowedZipUrl,
+  ALLOWED_UPDATE_HOSTS: [...ALLOWED_UPDATE_HOSTS],
 };

@@ -1,5 +1,11 @@
 # PDC Companion release notes
 
+## 0.1.18
+
+- **Matrix claim origin:** pre-approve only `https://matrix.privacydatacoin.com`
+  (web UI + claim). Remove mistaken `messenger.privacydatacoin.com` (no DNS).
+  Reload the extension / re-open Options once so stored Approved dApps update.
+
 ## 0.1.17
 
 - **Session persistence:** while the Qt wallet Companion RPC responds, the
@@ -12,11 +18,9 @@
   cleared and a notification asks you to paste it again when reconnecting.
 - **JWT access-token `exp`:** **30 minutes** (fresh token still minted on
   every RPC call; must stay below the wallet 1h salt window).
-- **Matrix claim:** pre-approve `https://matrix.privacydatacoin.com` and
-  `https://messenger.privacydatacoin.com` (same as Trade) so Messenger’s
-  **Sign with Companion** button can call `sign_message` without a manual
-  Approved dApps step. Reload Companion / re-open Options once after update
-  so defaults merge into stored origins.
+- **Matrix claim:** pre-approve `https://matrix.privacydatacoin.com` so
+  **Sign with Companion** can call `sign_message` without a manual Approved
+  dApps step. (0.1.18 drops the incorrect messenger host.)
 
 ## 0.1.16
 

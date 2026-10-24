@@ -13,13 +13,15 @@ function validOrigin(s) {
 const DEFAULT_APPROVED = [
   'https://trade.privacydatacoin.com',
   'https://matrix.privacydatacoin.com',
-  'https://messenger.privacydatacoin.com',
 ];
+
+const RETIRED_APPROVED = new Set(['https://messenger.privacydatacoin.com']);
 
 async function ensureTradeApproved() {
   const { approvedOrigins = [] } = await chrome.storage.local.get('approvedOrigins');
-  const list = Array.isArray(approvedOrigins) ? [...approvedOrigins] : [];
-  let changed = false;
+  const raw = Array.isArray(approvedOrigins) ? approvedOrigins : [];
+  const list = raw.filter((o) => !RETIRED_APPROVED.has(o));
+  let changed = list.length !== raw.length;
   for (const o of DEFAULT_APPROVED) {
     if (!list.includes(o)) {
       list.push(o);

@@ -18,8 +18,8 @@ protocol compatible with [`@privacydatacoin/pdc_web3`](../README.md)
 - **Origin pinning** — only explicitly approved dApp origins may call
   balance / transfer / swap / `sign_message` methods. Read-only info methods
   (`pdc.ping`, `pdc.getWalletInfo`, `pdc.getAddress`) work everywhere.
-  Default approved origins: Trade plus Matrix Messenger
-  (`matrix.privacydatacoin.com`, `messenger.privacydatacoin.com`) for claim.
+  Default approved origins: Trade plus Matrix web
+  (`matrix.privacydatacoin.com`) for claim.
 - **Ionic Swaps** — `pdc.createSwapProposal`, `pdc.getSwapProposalInfo`,
   `pdc.acceptSwapProposal` mapped to the native wallet RPC methods
   (`ionic_swap_generate_proposal`, `ionic_swap_get_proposal_info`,

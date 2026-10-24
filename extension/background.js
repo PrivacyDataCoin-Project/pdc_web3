@@ -37,8 +37,12 @@ const KNOWN_ASSETS = {
 const DEFAULT_APPROVED_ORIGINS = [
   'https://trade.privacydatacoin.com',
   'https://matrix.privacydatacoin.com',
-  'https://messenger.privacydatacoin.com',
 ];
+
+/** Mistaken host from 0.1.17 docs (no DNS); strip from stored approvedOrigins. */
+const RETIRED_APPROVED_ORIGINS = new Set([
+  'https://messenger.privacydatacoin.com',
+]);
 
 /** Methods safe to call without explicit origin approval. */
 const SAFE_METHODS = new Set([
@@ -49,11 +53,12 @@ const SAFE_METHODS = new Set([
   'pdc.getWallets',
 ]);
 
-/** Ensure default dApps are in approvedOrigins (idempotent). */
+/** Ensure default dApps are in approvedOrigins (idempotent); drop retired hosts. */
 async function ensureDefaultApprovedOrigins() {
   const { approvedOrigins = [] } = await chrome.storage.local.get('approvedOrigins');
-  const list = Array.isArray(approvedOrigins) ? [...approvedOrigins] : [];
-  let changed = false;
+  const raw = Array.isArray(approvedOrigins) ? approvedOrigins : [];
+  const list = raw.filter((o) => !RETIRED_APPROVED_ORIGINS.has(o));
+  let changed = list.length !== raw.length;
   for (const origin of DEFAULT_APPROVED_ORIGINS) {
     if (!list.includes(origin)) {
       list.push(origin);

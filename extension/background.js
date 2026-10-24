@@ -33,8 +33,12 @@ const KNOWN_ASSETS = {
   },
 };
 
-/** Always pre-approved so Trade works without a manual Settings step. */
-const DEFAULT_APPROVED_ORIGINS = ['https://trade.privacydatacoin.com'];
+/** Always pre-approved so Trade / Matrix claim work without a manual Settings step. */
+const DEFAULT_APPROVED_ORIGINS = [
+  'https://trade.privacydatacoin.com',
+  'https://matrix.privacydatacoin.com',
+  'https://messenger.privacydatacoin.com',
+];
 
 /** Methods safe to call without explicit origin approval. */
 const SAFE_METHODS = new Set([
@@ -107,12 +111,29 @@ async function sha256Hex(text) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** JWT exp claim lifetime (seconds). Keep below wallet salt anti-replay window (1h). */
-const JWT_EXP_SECONDS = 10 * 60;
+/**
+ * JWT exp claim lifetime (seconds). A fresh token is minted on every RPC call.
+ * Must stay below the wallet salt anti-replay window (1h in wallet_rpc_server).
+ */
+const JWT_EXP_SECONDS = 30 * 60;
 
-/** Force Companion JWT secret re-entry every N minutes (security rotation). */
-const JWT_SECRET_ROTATE_ALARM = 'pdc-jwt-secret-rotate';
-const JWT_SECRET_ROTATE_MINUTES = 10;
+/** MV3 service-worker keepalive + wallet presence probe. */
+const KEEPALIVE_ALARM = 'pdc-keepalive';
+const KEEPALIVE_PERIOD_MINUTES = 1;
+
+/**
+ * Legacy alarm name from 0.1.15–0.1.16 (forced secret wipe every 10 min).
+ * Cleared on startup so sessions no longer drop while the wallet is up.
+ */
+const LEGACY_JWT_SECRET_ROTATE_ALARM = 'pdc-jwt-secret-rotate';
+
+/**
+ * Clear stored Companion JWT secret only after the wallet RPC has been
+ * unreachable for this long (Companion OFF / wallet closed). While RPC
+ * responds, the secret is kept so Trade stays connected.
+ */
+const WALLET_OFFLINE_CLEAR_ALARM = 'pdc-wallet-offline-clear';
+const WALLET_OFFLINE_CLEAR_MINUTES = 60;
 
 /** HS256 JWT matching Zano Companion / docs.zano.org JWT guide. */
 async function createAccessToken(httpBody, secret) {
@@ -566,35 +587,73 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // async sendResponse
 });
 
-async function scheduleJwtSecretRotation() {
+/** Drop legacy forced-rotation alarm so online sessions are not wiped. */
+async function cancelLegacySecretRotation() {
+  await chrome.alarms?.clear?.(LEGACY_JWT_SECRET_ROTATE_ALARM);
+}
+
+/** Cancel pending offline secret clear (wallet responded again). */
+async function cancelWalletOfflineClear() {
+  await chrome.alarms?.clear?.(WALLET_OFFLINE_CLEAR_ALARM);
+}
+
+/**
+ * Schedule a one-shot clear of the stored JWT secret after sustained wallet
+ * unreachability. Does nothing if a clear is already pending or no secret.
+ */
+async function scheduleWalletOfflineClear() {
   if (!chrome.alarms?.create) return;
   const { jwtSecret = '' } = (await chrome.storage.local.get('jwtSecret')) ?? {};
-  if (String(jwtSecret || '').trim()) {
-    await chrome.alarms.create(JWT_SECRET_ROTATE_ALARM, {
-      delayInMinutes: JWT_SECRET_ROTATE_MINUTES,
-    });
-  } else {
-    await chrome.alarms.clear(JWT_SECRET_ROTATE_ALARM);
+  if (!String(jwtSecret || '').trim()) return;
+  const existing = await chrome.alarms.get?.(WALLET_OFFLINE_CLEAR_ALARM);
+  if (existing) return;
+  await chrome.alarms.create(WALLET_OFFLINE_CLEAR_ALARM, {
+    delayInMinutes: WALLET_OFFLINE_CLEAR_MINUTES,
+  });
+}
+
+/**
+ * Probe wallet RPC. While it responds, keep the Companion secret and cancel
+ * any offline-clear timer. After prolonged silence, clear the secret (wallet
+ * / Companion OFF) so a stale key is not left indefinitely.
+ */
+async function keepaliveWalletSession() {
+  try {
+    await walletRpc('getaddress');
+    await cancelWalletOfflineClear();
+  } catch {
+    await scheduleWalletOfflineClear();
   }
 }
 
-/** Clear stored JWT secret and notify — user must paste a freshly regenerated Companion Secret. */
-async function rotateJwtSecretForSecurity() {
+/**
+ * Clear stored JWT secret after wallet stayed unreachable — Companion OFF or
+ * wallet closed. User must paste a new/current Secret when reconnecting.
+ */
+async function clearJwtSecretAfterWalletOffline() {
   const { jwtSecret = '' } = (await chrome.storage.local.get('jwtSecret')) ?? {};
   if (!String(jwtSecret || '').trim()) return;
+  // Last-chance probe: wallet may have come back just before the alarm.
+  try {
+    await walletRpc('getaddress');
+    await cancelWalletOfflineClear();
+    return;
+  } catch {
+    /* still offline */
+  }
   await chrome.storage.local.set({
     jwtSecret: '',
     jwtSecretRotateRequired: true,
     jwtSecretRotatedAt: Date.now(),
   });
-  await chrome.alarms?.clear?.(JWT_SECRET_ROTATE_ALARM);
+  await cancelWalletOfflineClear();
   try {
-    await chrome.notifications?.create?.('pdc-jwt-secret-rotate', {
+    await chrome.notifications?.create?.('pdc-jwt-secret-offline', {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
       title: 'PDC Companion',
       message:
-        'New Companion key required for security reasons. Regenerate the secret in Qt wallet Settings → Pdc Companion, then paste it into Options.',
+        'Wallet Companion was offline for a while — stored secret cleared. Unlock the Qt wallet, enable Companion, then paste the Secret into Options.',
       priority: 2,
       requireInteraction: true,
     });
@@ -608,21 +667,25 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const next = changes.jwtSecret.newValue;
   if (String(next || '').trim()) {
     void chrome.storage.local.set({ jwtSecretRotateRequired: false });
+    void cancelWalletOfflineClear();
+  } else {
+    void cancelWalletOfflineClear();
   }
-  void scheduleJwtSecretRotation();
 });
 
 // Seed Trade as approved on install / update / SW start.
 chrome.runtime.onInstalled.addListener(() => {
   void ensureDefaultApprovedOrigins();
-  void scheduleJwtSecretRotation();
+  void cancelLegacySecretRotation();
 });
 void ensureDefaultApprovedOrigins();
-void scheduleJwtSecretRotation();
+void cancelLegacySecretRotation();
 
-// Keep-alive for MV3 service worker longevity during active sessions.
-chrome.alarms?.create('pdc-keepalive', { periodInMinutes: 4 });
+// Keepalive: MV3 SW longevity + stay connected while wallet Companion responds.
+chrome.alarms?.create(KEEPALIVE_ALARM, { periodInMinutes: KEEPALIVE_PERIOD_MINUTES });
 chrome.alarms?.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'pdc-keepalive') void walletRpc('getaddress').catch(() => {});
-  if (alarm.name === JWT_SECRET_ROTATE_ALARM) void rotateJwtSecretForSecurity();
+  if (alarm.name === KEEPALIVE_ALARM) void keepaliveWalletSession();
+  if (alarm.name === WALLET_OFFLINE_CLEAR_ALARM) void clearJwtSecretAfterWalletOffline();
+  // Ignore legacy alarm if Chrome still fires a queued one after upgrade.
+  if (alarm.name === LEGACY_JWT_SECRET_ROTATE_ALARM) void cancelLegacySecretRotation();
 });

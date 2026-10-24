@@ -10,7 +10,11 @@ function validOrigin(s) {
   }
 }
 
-const DEFAULT_APPROVED = ['https://trade.privacydatacoin.com'];
+const DEFAULT_APPROVED = [
+  'https://trade.privacydatacoin.com',
+  'https://matrix.privacydatacoin.com',
+  'https://messenger.privacydatacoin.com',
+];
 
 async function ensureTradeApproved() {
   const { approvedOrigins = [] } = await chrome.storage.local.get('approvedOrigins');

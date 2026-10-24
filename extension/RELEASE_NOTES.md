@@ -1,5 +1,23 @@
 # PDC Companion release notes
 
+## 0.1.17
+
+- **Session persistence:** while the Qt wallet Companion RPC responds, the
+  stored JWT secret is **kept** (no more forced wipe every 10 minutes from
+  0.1.15–0.1.16). Connection stays up for as long as the wallet is on.
+- **Keepalive:** wallet probe every **1 minute**; cancels any offline-clear
+  timer when RPC succeeds.
+- **Idle cleanup only when offline:** if wallet RPC stays unreachable for
+  **60 minutes** (Companion OFF / wallet closed), the stored secret is
+  cleared and a notification asks you to paste it again when reconnecting.
+- **JWT access-token `exp`:** **30 minutes** (fresh token still minted on
+  every RPC call; must stay below the wallet 1h salt window).
+- **Matrix claim:** pre-approve `https://matrix.privacydatacoin.com` and
+  `https://messenger.privacydatacoin.com` (same as Trade) so Messenger’s
+  **Sign with Companion** button can call `sign_message` without a manual
+  Approved dApps step. Reload Companion / re-open Options once after update
+  so defaults merge into stored origins.
+
 ## 0.1.16
 
 - **Update security:** auto-apply / download zip URLs must be `https` on
@@ -12,7 +30,8 @@
 - **Secret rotation:** 10 minutes after saving a Companion JWT secret, the
   extension clears it and shows a system notification that a **new key is
   required for security** — regenerate in Qt Settings → Pdc Companion and
-  paste into Options again.
+  paste into Options again. (**Superseded in 0.1.17** — wipe only after
+  prolonged wallet offline, not on a timer while the wallet is up.)
 
 ## 0.1.14
 

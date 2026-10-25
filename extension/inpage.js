@@ -98,6 +98,9 @@
     getBalance(params) {
       return call('pdc.getBalance', params);
     },
+    getAssets() {
+      return call('pdc.getAssets', {});
+    },
     signMessage(message) {
       // Wallet RPC expects { buff: base64 }. Accept raw string or { buff }.
       let params;

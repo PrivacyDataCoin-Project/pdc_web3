@@ -1,5 +1,14 @@
 # PDC Companion release notes
 
+## 0.1.19
+
+- **Fix `getBalance(asset_id)` for CAs:** read unlocked/locked from
+  `getbalance.balances[]` for the requested asset id. Top-level
+  `unlocked_balance` is native PDC only — older builds returned that for
+  every CA, so Trade showed ~PDC×1000 as “Available ARQX”.
+- **Expose `getAssets()`** on the inpage bridge (same rows as the popup).
+- Trade can prefer `getAssets` when present; update Companion to **0.1.19**.
+
 ## 0.1.18
 
 - **Matrix claim origin:** pre-approve only `https://matrix.privacydatacoin.com`

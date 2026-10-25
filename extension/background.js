@@ -462,9 +462,28 @@ async function handle(method, params, origin) {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
       const assetId = params?.asset_id;
       if (assetId && !isHex64(assetId)) throw rpcError(-32602, 'asset_id must be a 64-char hex asset id');
-      const r = await walletRpc('getbalance', assetId ? { asset_id: assetId } : {});
-      const unlocked = r.unlocked_balance ?? r.unlocked ?? r.total_unlocked ?? 0;
-      const total = r.balance ?? r.total ?? unlocked;
+      // Always ask for full getbalance — CA amounts live in balances[], while
+      // top-level unlocked_balance is native PDC only. Falling back to top-level
+      // for a CA id made Trade show ~PDC×1000 as "ARQX available".
+      const r = await walletRpc('getbalance', {});
+      const want = normalizeAssetId(assetId || NATIVE_ASSET_ID);
+      const list = Array.isArray(r.balances) ? r.balances : [];
+      const row = list.find(
+        b => normalizeAssetId(b?.asset_info?.asset_id ?? '') === want
+      );
+      let unlocked;
+      let total;
+      if (row) {
+        unlocked = row.unlocked ?? 0;
+        total = row.total ?? unlocked;
+      } else if (!assetId || want === NATIVE_ASSET_ID) {
+        unlocked = r.unlocked_balance ?? r.unlocked ?? r.total_unlocked ?? 0;
+        total = r.balance ?? r.total ?? unlocked;
+      } else {
+        // Requested CA not present — do not return native PDC.
+        unlocked = 0;
+        total = 0;
+      }
       const locked = BigInt(String(total)) - BigInt(String(unlocked));
       return {
         unlocked: String(unlocked),

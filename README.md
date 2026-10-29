@@ -46,7 +46,7 @@ const result = await wallet.transfer({
     amount: 1000000000000n, // 1 PDC (12 decimals)
     asset_id: getNativeAssetId('mainnet')
   }],
-  fee: 1000000000n // 0.001 PDC
+  fee: 10000000000n // 0.01 PDC (TX_DEFAULT_FEE)
 });
 console.log(`TX: ${result.tx_hash}`);
 
@@ -104,7 +104,7 @@ import { PdcNetwork, getNetworkConfig, getNativeAssetId } from '@privacydatacoin
 const mainnet = getNetworkConfig(PdcNetwork.MAINNET);
 console.log(mainnet.ticker); // 'PDC'
 console.log(mainnet.decimalPoint); // 12
-console.log(mainnet.defaultFee); // 1000000000n (0.001 PDC)
+console.log(mainnet.defaultFee); // 10000000000n (0.01 PDC)
 
 const nativeAssetId = getNativeAssetId(PdcNetwork.MAINNET);
 ```
@@ -130,7 +130,7 @@ const proposal = await wallet.generateSwapProposal({
   proposal: {
     to_finalizer: [{ asset_id: nativeAssetId, amount: 1000000000000n }], // Alice sends 1 PDC
     to_initiator: [{ asset_id: customAssetId, amount: 500000000000n }], // Alice wants 0.5 CustomAsset
-    fee_paid_by_a: 1000000000n,
+    fee_paid_by_a: 10000000000n, // 0.01 PDC
     expiration_time: Math.floor(Date.now() / 1000) + 3600 // 1 hour
   },
   destination_address: bobAddress
@@ -173,7 +173,7 @@ console.log('New asset ID:', deploy.new_asset_id);
 await wallet.emitAsset({
   asset_id: deploy.new_asset_id,
   distribution: [{ address: recipient, amount: 100000000000n }],
-  fee: 1000000000n
+  fee: 10000000000n // 0.01 PDC
 });
 ```
 

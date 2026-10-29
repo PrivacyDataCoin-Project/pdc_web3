@@ -62,8 +62,9 @@ describe('Network configuration', () => {
 
   it('all networks share fee and dust settings', () => {
     for (const cfg of Object.values(PDC_NETWORKS)) {
-      expect(cfg.defaultFee).toBe(1000000000n);
-      expect(cfg.dustThreshold).toBe(100000000n);
+      // PDC currency_config.h: TX_DEFAULT_FEE = 10000000000 (.01), DEFAULT_DUST_THRESHOLD = 0
+      expect(cfg.defaultFee).toBe(10000000000n);
+      expect(cfg.dustThreshold).toBe(0n);
     }
   });
 });

@@ -11,6 +11,10 @@ export function hexToBytes(hex: string): Uint8Array {
   if (clean.length % 2 !== 0) {
     throw new Error('Hex string must have even length');
   }
+  // parseInt('0g', 16) === 0 and parseInt('gg', 16) === NaN → Uint8Array stores 0.
+  if (!/^[0-9a-fA-F]*$/.test(clean)) {
+    throw new Error('Invalid hex string');
+  }
   const bytes = new Uint8Array(clean.length / 2);
   for (let i = 0; i < clean.length; i += 2) {
     bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16);
@@ -150,6 +154,12 @@ export function truncateHex(hex: string, byteLength: number): string {
  */
 export function reverseHexBytes(hex: string): string {
   const clean = normalizeHex(hex);
+  if (clean.length % 2 !== 0) {
+    throw new Error('Hex string must have even length');
+  }
+  if (!/^[0-9a-f]*$/.test(clean)) {
+    throw new Error('Invalid hex string');
+  }
   const bytes = [];
   for (let i = 0; i < clean.length; i += 2) {
     bytes.push(clean.slice(i, i + 2));

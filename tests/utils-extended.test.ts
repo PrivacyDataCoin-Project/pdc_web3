@@ -7,18 +7,17 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('axios', () => {
   const interceptors = {
     request: { use: vi.fn() },
-    response: { use: vi.fn() }
+    response: { use: vi.fn() },
   };
   const instance = {
     post: vi.fn(),
     defaults: { baseURL: '', auth: undefined as unknown, headers: {} as Record<string, string> },
-    interceptors
+    interceptors,
   };
   const axiosStub = { create: vi.fn(() => instance), __mockInstance: instance };
   return { default: axiosStub, __mockInstance: instance };
 });
- 
- 
+
 import {
   jsonToBigint,
   bigintToHex,
@@ -26,7 +25,7 @@ import {
   atomicToHuman,
   humanToAtomic,
   formatAmount,
-  parseAmount
+  parseAmount,
 } from '../src/utils/bigint';
 import {
   normalizeAlias,
@@ -36,7 +35,7 @@ import {
   formatAddress,
   isValidIntegratedAddress,
   extractPaymentIdFromIntegratedAddress,
-  createIntegratedAddress
+  createIntegratedAddress,
 } from '../src/utils/address';
 import {
   hexToBytes,
@@ -49,7 +48,7 @@ import {
   reverseHexBytes,
   randomHex,
   keyToHex,
-  hexToKey
+  hexToKey,
 } from '../src/utils/hex';
 
 describe('bigint extended coverage', () => {
@@ -168,12 +167,14 @@ describe('address extended coverage', () => {
     expect(isValidIntegratedAddress('pdc' + '0'.repeat(150))).toBe(false);
   });
 
-  it('extractPaymentIdFromIntegratedAddress is a stub returning null', () => {
-    expect(extractPaymentIdFromIntegratedAddress('anything')).toBeNull();
+  it('extractPaymentIdFromIntegratedAddress fails closed', () => {
+    expect(() => extractPaymentIdFromIntegratedAddress('anything')).toThrow(
+      /splitIntegratedAddress/
+    );
   });
 
-  it('createIntegratedAddress is a stub returning input address', () => {
-    expect(createIntegratedAddress('pdc1', 'pid')).toBe('pdc1');
+  it('createIntegratedAddress fails closed instead of dropping the payment id', () => {
+    expect(() => createIntegratedAddress('pdc1', 'pid')).toThrow(/makeIntegratedAddress/);
   });
 
   it('isValidPdcAddress rejects wrong network prefix when network specified', async () => {
@@ -248,7 +249,6 @@ describe('hex extended coverage', () => {
 
 // Re-export for the base64ToHex used above
 import { base64ToHex } from '../src/utils/hex';
-
 
 describe('branch completion: address', () => {
   it('isValidPdcAddress with empty string short-circuits before prefix check', async () => {
@@ -339,7 +339,7 @@ describe('branch completion: rpc-client & daemon-rpc-client', () => {
   it('WalletRpcClient transfer with all optional fields', async () => {
     const { WalletRpcClient } = await import('../src/api/wallet-rpc-client');
     const w = new WalletRpcClient({ url: 'http://localhost:1' });
-    const inst = (w.getClient().getAxiosInstance());
+    const inst = w.getClient().getAxiosInstance();
     inst.post.mockResolvedValueOnce({ data: { jsonrpc: '2.0', id: 1, result: { tx_hash: 't' } } });
     await w.transfer({
       destinations: [{ address: 'pdc1', amount: 1n }],
@@ -348,13 +348,12 @@ describe('branch completion: rpc-client & daemon-rpc-client', () => {
       payment_id: 'pid',
       unlock_time: 0,
       get_tx_keys: true,
-      do_not_relay: false
+      do_not_relay: false,
     });
     const [, body] = inst.post.mock.calls[0];
     expect(body.params).toMatchObject({ mixin: 10, payment_id: 'pid' });
   });
 });
-
 
 describe('final branch coverage', () => {
   it('isValidAlias 2-char regex path (a- matches regex but too short)', async () => {
@@ -482,12 +481,13 @@ describe('interceptor functions direct invocation', () => {
         isAxiosError: true,
         message: 'Request failed with status code 500',
         code: 'ERR_BAD_RESPONSE',
-        response: { status: 500, data: { foo: 'bar' } }
+        response: { status: 500, data: { foo: 'bar' } },
       });
     } catch (e) {
       caught = e;
     }
     expect(caught).toBeInstanceOf(RpcClientError);
     expect((caught as RpcClientError).data).toEqual({ foo: 'bar' });
+    expect((caught as RpcClientError).code).toBe(-32603);
   });
 });

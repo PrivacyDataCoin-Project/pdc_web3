@@ -14,31 +14,30 @@ import { DaemonRpcClient } from '../src/api/daemon-rpc-client';
 vi.mock('axios', () => {
   const interceptors = {
     request: { use: vi.fn() },
-    response: { use: vi.fn() }
+    response: { use: vi.fn() },
   };
   const instance = {
     post: vi.fn(),
     defaults: {
       baseURL: '',
       auth: undefined as unknown,
-      headers: {} as Record<string, string>
+      headers: {} as Record<string, string>,
     },
-    interceptors
+    interceptors,
   };
   const axiosMock = {
     create: vi.fn(() => instance),
-    default: {}
+    default: {},
   };
   return { default: axiosMock, __mockInstance: instance };
 });
 
 // Helper to get the shared mock instance
- 
+
 const axiosAny = axios as any;
 function getInstance() {
   return axiosAny.create.mock.results[0]?.value ?? axiosAny.__mockInstance;
 }
- 
 
 describe('RpcClient', () => {
   let client: RpcClient;
@@ -59,7 +58,7 @@ describe('RpcClient', () => {
       new RpcClient({
         url: 'http://localhost:1',
         username: 'user',
-        password: 'pass'
+        password: 'pass',
       });
       const createArgs = axiosAny.create.mock.calls.at(-1)![0] as Record<string, unknown>;
       expect(createArgs['auth']).toEqual({ username: 'user', password: 'pass' });
@@ -96,7 +95,7 @@ describe('RpcClient', () => {
   describe('call', () => {
     it('should send JSON-RPC request and return result', async () => {
       instance.post.mockResolvedValueOnce({
-        data: { jsonrpc: '2.0', id: 1, result: { height: 123 } }
+        data: { jsonrpc: '2.0', id: 1, result: { height: 123 } },
       });
 
       const result = await client.call('get_info');
@@ -107,12 +106,14 @@ describe('RpcClient', () => {
       expect(body).toMatchObject({
         jsonrpc: '2.0',
         method: 'get_info',
-        id: 1
+        id: 1,
       });
     });
 
     it('should increment request id across calls', async () => {
-      instance.post.mockResolvedValue({ data: { jsonrpc: '2.0', id: 1, result: null } });
+      instance.post.mockImplementation((_url: string, body: { id: number }) =>
+        Promise.resolve({ data: { jsonrpc: '2.0', id: body.id, result: null } })
+      );
 
       await client.call('a');
       await client.call('b');
@@ -135,15 +136,15 @@ describe('RpcClient', () => {
         data: {
           jsonrpc: '2.0',
           id: 1,
-          error: { code: -1002, message: 'WALLET_RPC_ERROR_CODE_WRONG_ADDRESS' }
-        }
+          error: { code: -1002, message: 'WALLET_RPC_ERROR_CODE_WRONG_ADDRESS' },
+        },
       });
 
       const promise = client.call('getaddress');
       await expect(promise).rejects.toThrow(RpcClientError);
       await expect(promise).rejects.toMatchObject({
         code: -1002,
-        message: 'WALLET_RPC_ERROR_CODE_WRONG_ADDRESS'
+        message: 'WALLET_RPC_ERROR_CODE_WRONG_ADDRESS',
       });
     });
 
@@ -152,7 +153,7 @@ describe('RpcClient', () => {
       const axiosError = {
         message: 'Network Error',
         code: 'ECONNREFUSED',
-        response: { data: { error: { code: -1, message: 'down' } } }
+        response: { data: { error: { code: -1, message: 'down' } } },
       };
 
       let caught: unknown;
@@ -178,6 +179,38 @@ describe('RpcClient', () => {
       }
       expect(caught).toBeInstanceOf(RpcClientError);
       expect((caught as RpcClientError).message).toBe('timeout of 30000ms exceeded');
+      expect((caught as RpcClientError).code).toBe(-32603);
+      expect((caught as RpcClientError).isTransportError()).toBe(true);
+    });
+
+    it('rejects a response whose id does not match the request', async () => {
+      instance.post.mockResolvedValueOnce({
+        data: { jsonrpc: '2.0', id: 99, result: { ok: true } },
+      });
+      await expect(client.call('get_info')).rejects.toThrow('id mismatch');
+    });
+
+    it('rejects a null JSON-RPC payload', async () => {
+      instance.post.mockResolvedValueOnce({ data: null });
+      await expect(client.call('get_info')).rejects.toThrow('id mismatch');
+    });
+
+    it('serializes bigint fields as decimal strings', () => {
+      const created = axiosAny.create.mock.calls.at(-1)![0] as {
+        transformRequest: Array<(data: unknown) => string>;
+      };
+      const body = created.transformRequest[0]!({
+        amount: 10n,
+        nested: { fee: 2n },
+        note: 'a',
+        items: [3n],
+      });
+      expect(JSON.parse(body)).toEqual({
+        amount: '10',
+        nested: { fee: '2' },
+        note: 'a',
+        items: ['3'],
+      });
     });
 
     it('should default code to -32603 when error.code is falsy', async () => {
@@ -200,14 +233,11 @@ describe('RpcClient', () => {
       instance.post.mockResolvedValueOnce({
         data: [
           { jsonrpc: '2.0', id: 1, result: { r: 1 } },
-          { jsonrpc: '2.0', id: 2, result: { r: 2 } }
-        ]
+          { jsonrpc: '2.0', id: 2, result: { r: 2 } },
+        ],
       });
 
-      const results = await client.batchCall([
-        { method: 'a' },
-        { method: 'b', params: { x: 1 } }
-      ]);
+      const results = await client.batchCall([{ method: 'a' }, { method: 'b', params: { x: 1 } }]);
 
       expect(results).toEqual([{ r: 1 }, { r: 2 }]);
       const [, body] = instance.post.mock.calls[0];
@@ -218,12 +248,54 @@ describe('RpcClient', () => {
       instance.post.mockResolvedValueOnce({
         data: [
           { jsonrpc: '2.0', id: 1, result: { ok: true } },
-          { jsonrpc: '2.0', id: 2, error: { code: -1, message: 'batch fail' } }
-        ]
+          { jsonrpc: '2.0', id: 2, error: { code: -1, message: 'batch fail' } },
+        ],
       });
 
       await expect(client.batchCall([{ method: 'a' }, { method: 'b' }])).rejects.toThrow(
         'batch fail'
+      );
+    });
+
+    it('reorders batch results by request id', async () => {
+      instance.post.mockResolvedValueOnce({
+        data: [
+          { jsonrpc: '2.0', id: 2, result: { r: 2 } },
+          { jsonrpc: '2.0', id: 1, result: { r: 1 } },
+        ],
+      });
+
+      const results = await client.batchCall([{ method: 'a' }, { method: 'b' }]);
+      expect(results).toEqual([{ r: 1 }, { r: 2 }]);
+    });
+
+    it('rejects a batch response that is not an array', async () => {
+      instance.post.mockResolvedValueOnce({
+        data: { jsonrpc: '2.0', error: { code: -32600, message: 'bad batch' } },
+      });
+      await expect(client.batchCall([{ method: 'a' }])).rejects.toThrow('not an array');
+    });
+
+    it('rejects a batch item without an id', async () => {
+      instance.post.mockResolvedValueOnce({
+        data: [null],
+      });
+      await expect(client.batchCall([{ method: 'a' }])).rejects.toThrow('missing id');
+    });
+
+    it('rejects a batch item whose id is null', async () => {
+      instance.post.mockResolvedValueOnce({
+        data: [{ jsonrpc: '2.0', id: null, result: { r: 1 } }],
+      });
+      await expect(client.batchCall([{ method: 'a' }])).rejects.toThrow('missing id');
+    });
+
+    it('rejects a batch that omits one request id', async () => {
+      instance.post.mockResolvedValueOnce({
+        data: [{ jsonrpc: '2.0', id: 1, result: { r: 1 } }],
+      });
+      await expect(client.batchCall([{ method: 'a' }, { method: 'b' }])).rejects.toThrow(
+        'Missing JSON-RPC batch response for id 2'
       );
     });
   });
@@ -264,6 +336,13 @@ describe('RpcClientError', () => {
     expect(new RpcClientError('x', -32000).isWalletError()).toBe(true);
     expect(new RpcClientError('x', -32099).isWalletError()).toBe(true);
     expect(new RpcClientError('x', -3200).isWalletError()).toBe(false);
+    expect(new RpcClientError('x', -1001).isWalletError()).toBe(true);
+    expect(new RpcClientError('x', -1005).isWalletError()).toBe(true);
+    expect(new RpcClientError('x', -1013).isWalletError()).toBe(true);
+    expect(new RpcClientError('x', -1000).isWalletError()).toBe(false);
+    expect(new RpcClientError('x', -1014).isWalletError()).toBe(false);
+    expect(new RpcClientError('x', 1).isWalletError()).toBe(false);
+    expect(new RpcClientError('x', -33000).isWalletError()).toBe(false);
   });
 
   it('isDaemonError for daemon code range', () => {
@@ -306,7 +385,9 @@ describe('WalletRpcClient', () => {
   });
 
   const respond = (result: unknown): void => {
-    instance.post.mockResolvedValueOnce({ data: { jsonrpc: '2.0', id: 1, result } });
+    instance.post.mockImplementationOnce((_url: string, body: { id: number }) =>
+      Promise.resolve({ data: { jsonrpc: '2.0', id: body.id, result } })
+    );
   };
 
   it('getBalance sends getbalance', async () => {
@@ -331,11 +412,11 @@ describe('WalletRpcClient', () => {
   it('transfer sends transfer with destinations', async () => {
     respond({ tx_hash: 'abc' });
     const r = await wallet.transfer({
-      destinations: [{ address: 'pdc1', amount: 5n }]
+      destinations: [{ address: 'pdc1', amount: 5n }],
     });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
       method: 'transfer',
-      params: { destinations: [{ address: 'pdc1', amount: 5n }] }
+      params: { destinations: [{ address: 'pdc1', amount: 5n }] },
     });
     expect(r.tx_hash).toBe('abc');
   });
@@ -351,7 +432,7 @@ describe('WalletRpcClient', () => {
     await wallet.getPayments({ payment_ids: ['pid1'] });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
       method: 'get_payments',
-      params: { payment_ids: ['pid1'] }
+      params: { payment_ids: ['pid1'] },
     });
   });
 
@@ -432,7 +513,7 @@ describe('WalletRpcClient', () => {
     await wallet.getAliasInfoByName('name');
     expect(instance.post.mock.calls[0][1]).toMatchObject({
       method: 'get_alias_info_by_name',
-      params: { alias: 'name' }
+      params: { alias: 'name' },
     });
   });
 
@@ -456,7 +537,7 @@ describe('WalletRpcClient', () => {
       price: 2n,
       price_asset_id: 'bb',
       expiration_time: 0,
-      fee: 3n
+      fee: 3n,
     });
     expect(instance.post.mock.calls[0][1]).toMatchObject({ method: 'marketplace_push_offer' });
   });
@@ -465,7 +546,7 @@ describe('WalletRpcClient', () => {
     respond({ tx_hash: 't' });
     await wallet.updateMarketplaceOffer({ offer_id: 'o1', fee: 1n });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
-      method: 'marketplace_push_update_offer'
+      method: 'marketplace_push_update_offer',
     });
   });
 
@@ -482,12 +563,12 @@ describe('WalletRpcClient', () => {
         to_finalizer: [{ asset_id: 'a', amount: 1n }],
         to_initiator: [{ asset_id: 'b', amount: 2n }],
         fee_paid_by_a: 3n,
-        expiration_time: 0
+        expiration_time: 0,
       },
-      destination_address: 'pdc2'
+      destination_address: 'pdc2',
     });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
-      method: 'ionic_swap_generate_proposal'
+      method: 'ionic_swap_generate_proposal',
     });
     expect(r.hex_raw_proposal).toBe('0xdead');
   });
@@ -500,12 +581,12 @@ describe('WalletRpcClient', () => {
         fee_paid_by_a: 0n,
         expiration_time: 0,
         mixin: 10,
-        proposer_address: 'pdc1'
-      }
+        proposer_address: 'pdc1',
+      },
     });
     await wallet.getSwapProposalInfo({ hex_raw_proposal: '0x01' });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
-      method: 'ionic_swap_get_proposal_info'
+      method: 'ionic_swap_get_proposal_info',
     });
   });
 
@@ -513,7 +594,7 @@ describe('WalletRpcClient', () => {
     respond({ result_tx_id: 'tx1' });
     const r = await wallet.acceptSwapProposal({ hex_raw_proposal: '0x01' });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
-      method: 'ionic_swap_accept_proposal'
+      method: 'ionic_swap_accept_proposal',
     });
     expect(r.result_tx_id).toBe('tx1');
   });
@@ -545,10 +626,10 @@ describe('WalletRpcClient', () => {
         decimal_point: 6,
         description: '',
         initial_supply: 1n,
-        distribution: []
+        distribution: [],
       },
       distribution: [{ address: 'pdc1', amount: 1n }],
-      fee: 1n
+      fee: 1n,
     });
     expect(instance.post.mock.calls[0][1]).toMatchObject({ method: 'deploy_new_asset' });
   });
@@ -558,7 +639,7 @@ describe('WalletRpcClient', () => {
     await wallet.emitAsset({
       asset_id: 'aa',
       distribution: [{ address: 'pdc1', amount: 1n }],
-      fee: 1n
+      fee: 1n,
     });
     expect(instance.post.mock.calls[0][1]).toMatchObject({ method: 'emit_asset' });
   });
@@ -573,9 +654,9 @@ describe('WalletRpcClient', () => {
         decimal_point: 6,
         description: '',
         initial_supply: 1n,
-        distribution: []
+        distribution: [],
       },
-      fee: 1n
+      fee: 1n,
     });
     expect(instance.post.mock.calls[0][1]).toMatchObject({ method: 'update_asset' });
   });
@@ -616,7 +697,6 @@ describe('WalletRpcClient', () => {
     expect(instance.defaults.auth).toBeUndefined();
   });
 
-
   it('makeIntegratedAddress/splitIntegratedAddress via WalletRpcClient covered above', async () => {
     respond({ integrated_address: 'ia' });
     const r = await wallet.makeIntegratedAddress({ payment_id: 'pid' });
@@ -633,7 +713,9 @@ describe('WalletRpcClient', () => {
   });
 
   it('getPayments/getBulkPayments return payment arrays', async () => {
-    respond({ payments: [{ payment_id: 'p', tx_hash: 't', amount: 1n, block_height: 2, unlock_time: 0 }] });
+    respond({
+      payments: [{ payment_id: 'p', tx_hash: 't', amount: 1n, block_height: 2, unlock_time: 0 }],
+    });
     const p1 = await wallet.getPayments({ payment_ids: ['p'] });
     expect(p1.payments[0]?.tx_hash).toBe('t');
 
@@ -643,7 +725,9 @@ describe('WalletRpcClient', () => {
   });
 
   it('getPayments/getBulkPayments return payment arrays', async () => {
-    respond({ payments: [{ payment_id: 'p', tx_hash: 't', amount: 1n, block_height: 2, unlock_time: 0 }] });
+    respond({
+      payments: [{ payment_id: 'p', tx_hash: 't', amount: 1n, block_height: 2, unlock_time: 0 }],
+    });
     const p1 = await wallet.getPayments({ payment_ids: ['p'] });
     expect(p1.payments[0]?.tx_hash).toBe('t');
 
@@ -668,7 +752,9 @@ describe('DaemonRpcClient', () => {
   });
 
   const respond = (result: unknown): void => {
-    instance.post.mockResolvedValueOnce({ data: { jsonrpc: '2.0', id: 1, result } });
+    instance.post.mockImplementationOnce((_url: string, body: { id: number }) =>
+      Promise.resolve({ data: { jsonrpc: '2.0', id: body.id, result } })
+    );
   };
 
   it('getInfo sends get_info', async () => {
@@ -689,7 +775,7 @@ describe('DaemonRpcClient', () => {
     await daemon.getBlocksDirect({ block_ids: ['h1', 'h2'] });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
       method: 'get_blocks_direct',
-      params: { block_ids: ['h1', 'h2'] }
+      params: { block_ids: ['h1', 'h2'] },
     });
   });
 
@@ -709,7 +795,7 @@ describe('DaemonRpcClient', () => {
     respond({ outs: [], status: 'OK' });
     await daemon.getRandomOutputsForAmounts({ amounts: [1n], count: 10 });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
-      method: 'get_random_outputs_for_amounts'
+      method: 'get_random_outputs_for_amounts',
     });
   });
 
@@ -717,7 +803,7 @@ describe('DaemonRpcClient', () => {
     respond({ outs: [], status: 'OK' });
     await daemon.getRandomOutputsForAmounts3({ amounts: [1n], count: 10 });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
-      method: 'get_random_outputs_for_amounts3'
+      method: 'get_random_outputs_for_amounts3',
     });
   });
 
@@ -726,7 +812,7 @@ describe('DaemonRpcClient', () => {
     const r = await daemon.sendRawTx({ tx_blob: 'deadbeef' });
     expect(instance.post.mock.calls[0][1]).toMatchObject({
       method: 'send_raw_tx',
-      params: { tx_blob: 'deadbeef' }
+      params: { tx_blob: 'deadbeef' },
     });
     expect(r.tx_hash).toBe('t');
   });

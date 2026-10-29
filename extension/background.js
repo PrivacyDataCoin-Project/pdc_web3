@@ -12,6 +12,9 @@
  *    (options page) and used only from this worker, never exposed to pages.
  *  - Requests from unapproved origins are rejected with code -32010.
  */
+import { assertWalletMethodAllowed } from './secret-wallet-methods.mjs';
+import { messageOrigin } from './message-origin.mjs';
+
 const DEFAULT_RPC = 'http://127.0.0.1:19212/json_rpc';
 /** HTTP header expected by wallet_rpc_server (ZANO_ACCESS_TOKEN → Pdc-Access-Token). */
 const PDC_ACCESS_TOKEN = 'Pdc-Access-Token';
@@ -47,6 +50,8 @@ const RETIRED_APPROVED_ORIGINS = new Set([
 /** Methods safe to call without explicit origin approval. */
 const SAFE_METHODS = new Set([
   'pdc.ping',
+  'pdc.connect',
+  'pdc.disconnect',
   'pdc.getWalletInfo',
   'pdc.getAddress',
   'pdc.getRpcConfig',
@@ -378,6 +383,7 @@ async function handle(method, params, origin) {
       };
     }
 
+    case 'pdc.connect':
     case 'pdc.getWalletInfo': {
       // PDC simplewallet uses get_wallet_info / getaddress (not Zano get_status / get_address)
       const info = await walletRpc('get_wallet_info');
@@ -389,6 +395,9 @@ async function handle(method, params, origin) {
         version: chrome.runtime.getManifest().version,
       };
     }
+
+    case 'pdc.disconnect':
+      return { ok: true };
 
     case 'pdc.getAddress': {
       const r = await walletRpc('getaddress');
@@ -581,7 +590,8 @@ async function handle(method, params, origin) {
 
     case 'pdc.callWalletRpc': {
       if (!approved) throw rpcError(-32010, `origin ${origin} is not approved for ${method}`);
-      return walletRpc(params.method, params.params);
+      const methodName = assertWalletMethodAllowed(params?.method);
+      return walletRpc(methodName, params?.params);
     }
 
     default:
@@ -599,7 +609,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return;
   }
   if (!msg || msg.pdcExtension !== true || !msg.method) return;
-  const origin = sender.origin ?? sender.url ?? 'unknown';
+  const origin = messageOrigin(sender);
   (async () => {
     try {
       const result = await handle(msg.method, msg.params, origin);

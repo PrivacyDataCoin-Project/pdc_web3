@@ -50,27 +50,57 @@ export type ExtensionEventCallback<K extends keyof ExtensionEventMap> = (
 ) => void;
 
 /**
- * Trusted origins allowed to talk to this bridge.
- * - The page's own origin (same-document extension content scripts relay here).
- * - chrome-extension:// / moz-extension:// are validated separately (opaque ids).
+ * Origins allowed to deliver results into this page.
+ * Content script replies use the page origin (see extension/content.js).
+ * Extension ids are trusted only when listed here — never every chrome-extension://.
  */
 let TRUSTED_ORIGINS: readonly string[] = [
   typeof window !== 'undefined' ? window.location.origin : '',
 ].filter(Boolean);
 
-/** Restrict which origins this bridge accepts messages from (call before connect). */
+function pageOrigin(): string {
+  return typeof window !== 'undefined' ? window.location.origin : '';
+}
+
+/**
+ * Replace the extra allowlist. The page origin is always kept: Companion
+ * relays postMessage from that origin, so dropping it would discard real replies.
+ */
 export function setTrustedOrigins(origins: readonly string[]): void {
-  TRUSTED_ORIGINS = origins.filter(Boolean);
+  const next = origins.filter(Boolean);
+  const page = pageOrigin();
+  if (page && !next.includes(page)) {
+    next.unshift(page);
+  }
+  TRUSTED_ORIGINS = next;
 }
 
 function isTrustedOrigin(origin: string): boolean {
   if (!origin) return false;
-  if (TRUSTED_ORIGINS.includes(origin)) return true;
-  // Extension content scripts relay through the page origin, but the MessageEvent
-  // origin for a real extension response is the extension origin. Accept any
-  // extension scheme; the extension must pin exact ids in production via
-  // setTrustedOrigins(['chrome-extension://<id>']).
-  return origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://');
+  return TRUSTED_ORIGINS.includes(origin);
+}
+
+/** Decimal strings — chrome.runtime.sendMessage JSON-encodes and rejects bigint. */
+function toJsonSafe(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (Array.isArray(value)) return value.map(item => toJsonSafe(item));
+  if (typeof value === 'object' && value) {
+    const out: Record<string, unknown> = {};
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = toJsonSafe(inner);
+    }
+    return out;
+  }
+  return value;
+}
+
+function isWalletInfo(result: unknown): result is ExtensionWalletInfo {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    typeof (result as ExtensionWalletInfo).address === 'string' &&
+    (result as ExtensionWalletInfo).address.length > 0
+  );
 }
 
 export class ExtensionBridge {
@@ -79,7 +109,7 @@ export class ExtensionBridge {
   private eventListeners: Map<keyof ExtensionEventMap, Set<(data: unknown) => void>> = new Map();
   private messageId = 0;
   private pendingRequests: Map<
-    number,
+    string,
     { resolve: (value: unknown) => void; reject: (reason: Error) => void }
   > = new Map();
 
@@ -91,19 +121,18 @@ export class ExtensionBridge {
   }
 
   private handleMessage(event: MessageEvent): void {
+    // Same-window only. A child frame (even same-origin) must not settle requests.
+    if (event.source !== window) return;
     // Security: drop messages from untrusted origins (prevents cross-tab spoofing
     // of RPC responses and injection of forged results into pendingRequests).
     if (!isTrustedOrigin(event.origin)) return;
 
     // Only accept messages relayed by the extension through this document
     const rawData: unknown = event.data;
-    if (
-      (rawData as { pdcExtension?: boolean } | null)?.pdcExtension !== true
-    )
-      return;
+    if ((rawData as { pdcExtension?: boolean } | null)?.pdcExtension !== true) return;
 
     interface ExtensionMessage {
-      id?: number;
+      id?: string;
       result?: unknown;
       error?: { message: string; code: number; data?: unknown };
       event?: keyof ExtensionEventMap;
@@ -133,53 +162,76 @@ export class ExtensionBridge {
 
   private sendMessage(method: string, params?: unknown): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      const id = ++this.messageId;
-      this.pendingRequests.set(id, { resolve, reject });
+      // String ids do not collide with extension/inpage.js numeric ids.
+      const id = `sdk:${++this.messageId}`;
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new ExtensionError('Request timeout', -32603));
+      }, 30000);
+      this.pendingRequests.set(id, {
+        resolve: value => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        reject: reason => {
+          clearTimeout(timer);
+          reject(reason);
+        },
+      });
 
-      // Security: never use '*' — restrict to our own origin; the extension
-      // content script relays to the extension background with its own pinning.
+      // Target the page window. A chrome-extension:// targetOrigin is dropped
+      // because this window's origin is the page. content.js requires source.
       window.postMessage(
         {
           pdcExtension: true,
+          source: 'pdc-inpage',
           id,
           method,
-          params,
+          params: toJsonSafe(params),
         },
-        TRUSTED_ORIGINS[0] ?? window.location.origin
+        window.location.origin
       );
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        if (this.pendingRequests.has(id)) {
-          this.pendingRequests.delete(id);
-          reject(new ExtensionError('Request timeout', -32603));
-        }
-      }, 30000);
     });
+  }
+
+  private adoptWallet(result: unknown): ExtensionWalletInfo {
+    if (!isWalletInfo(result)) {
+      throw new ExtensionError('Extension returned no wallet address', -32603);
+    }
+    this.connected = true;
+    this.walletInfo = result;
+    return result;
   }
 
   // ============ Connection ============
 
   async connect(request: ExtensionConnectionRequest): Promise<ExtensionWalletInfo> {
-    const result = (await this.sendMessage('pdc.connect', request)) as ExtensionWalletInfo;
-    this.connected = true;
-    this.walletInfo = result;
-    this.emit('connect', result);
-    return result;
+    // Companion implements pdc.getWalletInfo. pdc.connect was never handled,
+    // so connect() always failed against the published extension.
+    const result = await this.sendMessage('pdc.getWalletInfo', request);
+    const info = this.adoptWallet(result);
+    this.emit('connect', info);
+    return info;
   }
 
   async disconnect(): Promise<void> {
-    await this.sendMessage('pdc.disconnect');
-    this.connected = false;
-    this.walletInfo = null;
-    this.emit('disconnect', undefined);
+    try {
+      await this.sendMessage('pdc.disconnect');
+    } catch (err) {
+      // Older companions reject unknown methods with -32601. Local session still ends.
+      if (!(err instanceof ExtensionError && err.code === -32601)) {
+        throw err;
+      }
+    } finally {
+      this.connected = false;
+      this.walletInfo = null;
+      this.emit('disconnect', undefined);
+    }
   }
 
   async validateConnection(): Promise<ExtensionWalletInfo> {
-    const result = (await this.sendMessage('pdc.getWalletInfo')) as ExtensionWalletInfo;
-    this.connected = true;
-    this.walletInfo = result;
-    return result;
+    const result = await this.sendMessage('pdc.getWalletInfo');
+    return this.adoptWallet(result);
   }
 
   isConnected(): boolean {
@@ -372,6 +424,8 @@ export class ExtensionBridge {
       const timeout = setTimeout(() => resolve(false), 100);
 
       const handler = (event: MessageEvent) => {
+        if (event.source !== window) return;
+        if (!isTrustedOrigin(event.origin)) return;
         const msg = event.data as { pdcExtension?: boolean; method?: string } | null;
         if (msg?.pdcExtension === true && msg.method === 'pdc.ping') {
           clearTimeout(timeout);
@@ -381,7 +435,10 @@ export class ExtensionBridge {
       };
 
       window.addEventListener('message', handler);
-      window.postMessage({ pdcExtension: true, method: 'pdc.ping' }, TRUSTED_ORIGINS[0] ?? window.location.origin);
+      window.postMessage(
+        { pdcExtension: true, method: 'pdc.ping', source: 'pdc-inpage' },
+        window.location.origin
+      );
     });
   }
 

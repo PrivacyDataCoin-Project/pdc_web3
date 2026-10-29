@@ -5,8 +5,6 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
- 
-
 type Listener = (evt: { data?: unknown; source?: unknown }) => void;
 
 interface FakeWindow {
@@ -40,7 +38,7 @@ function installFakeWindow(): void {
     dispatchWithOrigin: (data: unknown, origin: string) => {
       const evt = { data, source: fakeWindow, origin };
       listeners.get('message')?.forEach(cb => cb(evt));
-    }
+    },
   };
   (globalThis as Record<string, unknown>)['window'] = fakeWindow;
 }
@@ -115,7 +113,7 @@ describe('ExtensionBridge', () => {
       address: 'pdc1',
       network: 'mainnet',
       isConnected: true,
-      version: '1.0.0'
+      version: '1.0.0',
     };
 
     const emitted: unknown[] = [];
@@ -136,7 +134,7 @@ describe('ExtensionBridge', () => {
     const result = await bridge.connect({
       appName: 'TestApp',
       appUrl: 'https://t.local',
-      requiredPermissions: ['wallet.connect']
+      requiredPermissions: ['wallet.connect'],
     });
 
     expect(result).toEqual(walletInfo);
@@ -220,7 +218,9 @@ describe('ExtensionBridge', () => {
 
   it('getAssets returns asset list', async () => {
     const bridge = makeBridge();
-    const assets = [{ asset_id: 'a', name: 'N', ticker: 'NNN', decimal_point: 6, unlocked: 1n, locked: 0n }];
+    const assets = [
+      { asset_id: 'a', name: 'N', ticker: 'NNN', decimal_point: 6, unlocked: 1n, locked: 0n },
+    ];
     setTimeout(() => respondToNextPost(assets), 0);
     expect(await bridge.getAssets()).toEqual(assets);
   });
@@ -234,7 +234,9 @@ describe('ExtensionBridge', () => {
     const [data] = postMock.mock.calls[0];
     expect(data).toMatchObject({
       method: 'pdc.transfer',
-      params: { destination: 'pdc1', amount: 10n, fee: 1n }
+      source: 'pdc-inpage',
+      id: 'sdk:1',
+      params: { destination: 'pdc1', amount: '10', fee: '1' },
     });
   });
 
@@ -253,7 +255,10 @@ describe('ExtensionBridge', () => {
 
   it('staking operations', async () => {
     const bridge = makeBridge();
-    setTimeout(() => respondToNextPost({ active: true, estimated_time_to_block: 60, stake_amount: 1n }), 0);
+    setTimeout(
+      () => respondToNextPost({ active: true, estimated_time_to_block: 60, stake_amount: 1n }),
+      0
+    );
     const info = await bridge.getStakingInfo();
     expect(info.active).toBe(true);
 
@@ -271,7 +276,7 @@ describe('ExtensionBridge', () => {
       to_initiator: [{ asset_id: 'b', amount: 2n }],
       fee_paid_by_a: 3n,
       expiration_time: 0,
-      destination_address: 'pdc1'
+      destination_address: 'pdc1',
     });
     expect(created).toEqual({ hex_raw_proposal: '0xff' });
     expect((postMock.mock.calls[0][0] as Record<string, unknown>).method).toBe(
@@ -285,7 +290,7 @@ describe('ExtensionBridge', () => {
           to_initiator: [{ asset_id: 'b', amount: 2n }],
           fee_paid_by_a: 3n,
           expiration_time: 0,
-          proposer_address: 'pdc1'
+          proposer_address: 'pdc1',
         }),
       0
     );
@@ -316,16 +321,12 @@ describe('ExtensionBridge', () => {
     setTimeout(() => respondToNextPost({ balance: 1n }), 0);
     const w = await bridge.callWalletRpc('getbalance');
     expect(w).toEqual({ balance: 1n });
-    expect((postMock.mock.calls[0][0] as Record<string, unknown>).method).toBe(
-      'pdc.callWalletRpc'
-    );
+    expect((postMock.mock.calls[0][0] as Record<string, unknown>).method).toBe('pdc.callWalletRpc');
 
     setTimeout(() => respondToNextPost({ height: 5 }), 0);
     const d = await bridge.callDaemonRpc('get_info');
     expect(d).toEqual({ height: 5 });
-    expect((postMock.mock.calls[1][0] as Record<string, unknown>).method).toBe(
-      'pdc.callDaemonRpc'
-    );
+    expect((postMock.mock.calls[1][0] as Record<string, unknown>).method).toBe('pdc.callDaemonRpc');
   });
 
   it('on() callback fires for matching event and off() removes it', async () => {
@@ -339,7 +340,7 @@ describe('ExtensionBridge', () => {
     fakeWindow.dispatch({
       pdcExtension: true,
       event: 'balanceChanged',
-      data: { assetId: 'a', balance: 1n }
+      data: { assetId: 'a', balance: 1n },
     });
     await new Promise(r => setTimeout(r, 5));
     expect(calls).toEqual([{ assetId: 'a', balance: 1n }]);
@@ -348,7 +349,7 @@ describe('ExtensionBridge', () => {
     fakeWindow.dispatch({
       pdcExtension: true,
       event: 'balanceChanged',
-      data: { assetId: 'a', balance: 2n }
+      data: { assetId: 'a', balance: 2n },
     });
     await new Promise(r => setTimeout(r, 5));
     expect(calls).toHaveLength(1); // no new calls after unsub
@@ -394,7 +395,7 @@ describe('ExtensionBridge', () => {
       fakeWindow.dispatch({
         pdcExtension: true,
         id: call.id,
-        result: { address: 'second' }
+        result: { address: 'second' },
       });
     }).not.toThrow();
   });
@@ -547,11 +548,17 @@ describe('origin security (M2)', () => {
     const { id } = postMock.mock.calls[0][0] as { id: number };
 
     // foreign origin → dropped
-    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'EVIL' } }, 'https://evil.example');
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id, result: { address: 'EVIL' } },
+      'https://evil.example'
+    );
     await new Promise(r => setTimeout(r, 10));
 
     // trusted origin → resolved
-    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'pdcOK' } }, 'https://test.local');
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id, result: { address: 'pdcOK' } },
+      'https://test.local'
+    );
     expect(await p).toBe('pdcOK');
   });
 
@@ -565,10 +572,18 @@ describe('origin security (M2)', () => {
 
     const listeners = ((fakeWindow as any).listeners as Map<string, Set<Listener>>).get('message')!;
     // evil origin
-    const evil = { data: { pdcExtension: true, id, result: { address: 'EVIL' } }, source: fakeWindow, origin: 'https://evil.example' };
+    const evil = {
+      data: { pdcExtension: true, id, result: { address: 'EVIL' } },
+      source: fakeWindow,
+      origin: 'https://evil.example',
+    };
     listeners.forEach(cb => (cb as (e: unknown) => void)(evil));
     // trusted extension origin
-    const good = { data: { pdcExtension: true, id, result: { address: 'pdcOK' } }, source: fakeWindow, origin: 'chrome-extension://abcdef' };
+    const good = {
+      data: { pdcExtension: true, id, result: { address: 'pdcOK' } },
+      source: fakeWindow,
+      origin: 'chrome-extension://abcdef',
+    };
     listeners.forEach(cb => (cb as (e: unknown) => void)(good));
 
     expect(await p).toBe('pdcOK');
@@ -607,7 +622,10 @@ describe('origin security — remaining branches', () => {
     // empty origin → dropped
     fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'EVIL' } }, '');
     await new Promise(r => setTimeout(r, 10));
-    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'pdcOK' } }, 'https://test.local');
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id, result: { address: 'pdcOK' } },
+      'https://test.local'
+    );
     expect(await p).toBe('pdcOK');
   });
 
@@ -618,12 +636,15 @@ describe('origin security — remaining branches', () => {
     const p = bridge.getAddress();
     const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
     const { id } = postMock.mock.calls[0][0] as { id: number };
-    fakeWindow.dispatchWithOrigin({ pdcExtension: true, id, result: { address: 'pdcOK' } }, 'https://exact-match.example');
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id, result: { address: 'pdcOK' } },
+      'https://exact-match.example'
+    );
     expect(await p).toBe('pdcOK');
     setTrustedOrigins([]);
   });
 
-  it('sendMessage uses TRUSTED_ORIGINS[0] when set (not location.origin)', async () => {
+  it('sendMessage always targets the page origin', async () => {
     const { setTrustedOrigins } = mod;
     setTrustedOrigins(['https://pinned.example']);
     const bridge = new mod.ExtensionBridge();
@@ -631,7 +652,7 @@ describe('origin security — remaining branches', () => {
     const p = bridge.getAddress();
     await new Promise(r => setTimeout(r, 5));
     const [, targetOrigin] = postMock.mock.calls.at(-1)!;
-    expect(targetOrigin).toBe('https://pinned.example');
+    expect(targetOrigin).toBe('https://test.local');
     setTrustedOrigins([]);
     void p;
   });
@@ -644,7 +665,10 @@ describe('origin security — remaining branches', () => {
       const msg = data as { method?: string };
       if (msg?.method === 'pdc.ping') {
         setTimeout(() => {
-          fakeWindow.dispatchWithOrigin({ pdcExtension: true, method: 'pdc.ping' }, 'https://pinned.example');
+          fakeWindow.dispatchWithOrigin(
+            { pdcExtension: true, method: 'pdc.ping' },
+            'https://pinned.example'
+          );
         }, 0);
       }
     });
@@ -681,7 +705,10 @@ describe('origin security — default target origin branch', () => {
       const msg = data as { method?: string };
       if (msg?.method === 'pdc.ping') {
         setTimeout(() => {
-          fakeWindow.dispatchWithOrigin({ pdcExtension: true, method: 'pdc.ping' }, 'https://test.local');
+          fakeWindow.dispatchWithOrigin(
+            { pdcExtension: true, method: 'pdc.ping' },
+            'https://test.local'
+          );
         }, 0);
       }
     });
@@ -722,12 +749,176 @@ describe('origin security — empty TRUSTED_ORIGINS fallback', () => {
       const msg = data as { method?: string };
       if (msg?.method === 'pdc.ping') {
         setTimeout(() => {
-          fakeWindow.dispatchWithOrigin({ pdcExtension: true, method: 'pdc.ping' }, 'https://test.local');
+          fakeWindow.dispatchWithOrigin(
+            { pdcExtension: true, method: 'pdc.ping' },
+            'https://test.local'
+          );
         }, 0);
       }
     });
     await mod.ExtensionBridge.detectExtension();
     const [, targetOrigin] = postMock.mock.calls.at(-1)!;
     expect(targetOrigin).toBe('https://test.local');
+  });
+});
+
+describe('extension bridge hardening', () => {
+  beforeEach(async () => {
+    installFakeWindow();
+    vi.resetModules();
+    mod = await import('../src/extension/extension-bridge');
+  });
+  afterEach(() => {
+    removeFakeWindow();
+    vi.restoreAllMocks();
+  });
+
+  it('connect calls pdc.getWalletInfo and rejects an empty wallet payload', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    setTimeout(() => respondToNextPost({ address: 'pdcOK', network: 'mainnet' }), 0);
+    const info = await bridge.connect({
+      appName: 'T',
+      appUrl: 'https://t',
+      requiredPermissions: ['wallet.connect'],
+    });
+    expect(info.address).toBe('pdcOK');
+    expect(postMock.mock.calls[0][0]).toMatchObject({
+      method: 'pdc.getWalletInfo',
+      source: 'pdc-inpage',
+    });
+
+    const bad = new mod.ExtensionBridge();
+    for (const payload of [null, 'pdc', { address: 1 }, { address: '' }]) {
+      setTimeout(() => respondToNextPost(payload), 0);
+      await expect(
+        bad.connect({ appName: 'T', appUrl: 'https://t', requiredPermissions: [] })
+      ).rejects.toThrow('no wallet address');
+      expect(bad.isConnected()).toBe(false);
+    }
+  });
+
+  it('stringifies nested bigint and preserves null', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    setTimeout(() => respondToNextPost({ ok: true }), 0);
+    await bridge.callWalletRpc('getbalance', { extra: null, amount: 4n, rows: [{ fee: 8n }] });
+    expect(postMock.mock.calls[0][0]).toMatchObject({
+      params: { method: 'getbalance', params: { extra: null, amount: '4', rows: [{ fee: '8' }] } },
+    });
+  });
+
+  it('disconnect treats unknown-method as a local logout', async () => {
+    const bridge = new mod.ExtensionBridge();
+    setTimeout(() => respondToNextPost({ address: 'pdc1' }), 0);
+    await bridge.connect({ appName: 'T', appUrl: 'https://t', requiredPermissions: [] });
+    setTimeout(() => respondToNextPost(null, { error: { code: -32601, message: 'nope' } }), 0);
+    await bridge.disconnect();
+    expect(bridge.isConnected()).toBe(false);
+  });
+
+  it('disconnect clears local state when the extension returns another error', async () => {
+    const bridge = new mod.ExtensionBridge();
+    setTimeout(() => respondToNextPost({ address: 'pdc1' }), 0);
+    await bridge.connect({ appName: 'T', appUrl: 'https://t', requiredPermissions: [] });
+    setTimeout(() => respondToNextPost(null, { error: { code: -32000, message: 'nope' } }), 0);
+    await expect(bridge.disconnect()).rejects.toMatchObject({ code: -32000 });
+    expect(bridge.isConnected()).toBe(false);
+  });
+
+  it('disconnect rethrows non-extension failures after clearing state', async () => {
+    const bridge = new mod.ExtensionBridge();
+    setTimeout(() => respondToNextPost({ address: 'pdc1' }), 0);
+    await bridge.connect({ appName: 'T', appUrl: 'https://t', requiredPermissions: [] });
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    postMock.mockImplementationOnce(() => {
+      throw new Error('post failed');
+    });
+    await expect(bridge.disconnect()).rejects.toThrow('post failed');
+    expect(bridge.isConnected()).toBe(false);
+    vi.clearAllTimers();
+  });
+
+  it('drops frames and unpinned extension origins', async () => {
+    const bridge = new mod.ExtensionBridge();
+    const p = bridge.getAddress();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const { id } = postMock.mock.calls[0][0] as { id: string };
+    const listeners = (
+      fakeWindow as unknown as { listeners: Map<string, Set<Listener>> }
+    ).listeners.get('message')!;
+    listeners.forEach(cb =>
+      cb({
+        data: { pdcExtension: true, id, result: { address: 'EVIL' } },
+        source: {},
+        origin: 'https://test.local',
+      })
+    );
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id, result: { address: 'EVIL' } },
+      'chrome-extension://not-pinned'
+    );
+    fakeWindow.dispatch({ pdcExtension: true, id, result: { address: 'pdcOK' } });
+    expect(await p).toBe('pdcOK');
+  });
+
+  it('keeps the page origin when pinning an extra origin', async () => {
+    mod.setTrustedOrigins(['https://other.example']);
+    const bridge = new mod.ExtensionBridge();
+    const p = bridge.getAddress();
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    const { id } = postMock.mock.calls[0][0] as { id: string };
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id, result: { address: 'pdcOK' } },
+      'https://test.local'
+    );
+    expect(await p).toBe('pdcOK');
+
+    mod.setTrustedOrigins(['https://test.local', 'https://other.example']);
+    const bridge2 = new mod.ExtensionBridge();
+    const p2 = bridge2.getAddress();
+    const { id: id2 } = postMock.mock.calls.at(-1)![0] as { id: string };
+    fakeWindow.dispatchWithOrigin(
+      { pdcExtension: true, id: id2, result: { address: 'pdc2' } },
+      'https://other.example'
+    );
+    expect(await p2).toBe('pdc2');
+    mod.setTrustedOrigins([]);
+  });
+
+  it('detectExtension ignores other frames and foreign origins', async () => {
+    const postMock = fakeWindow.postMessage as unknown as ReturnType<typeof vi.fn>;
+    postMock.mockImplementation((data: unknown) => {
+      const msg = data as { method?: string };
+      if (msg?.method !== 'pdc.ping') return;
+      setTimeout(() => {
+        const listeners = (
+          fakeWindow as unknown as { listeners: Map<string, Set<Listener>> }
+        ).listeners.get('message')!;
+        listeners.forEach(cb =>
+          cb({
+            data: { pdcExtension: true, method: 'pdc.ping' },
+            source: {},
+            origin: 'https://test.local',
+          })
+        );
+        listeners.forEach(cb =>
+          cb({
+            data: { pdcExtension: true, method: 'pdc.ping' },
+            source: fakeWindow,
+            origin: 'https://evil.example',
+          })
+        );
+        fakeWindow.dispatch({ pdcExtension: true, method: 'pdc.ping' });
+      }, 0);
+    });
+    await expect(mod.ExtensionBridge.detectExtension()).resolves.toBe(true);
+  });
+
+  it('setTrustedOrigins does not throw when window is missing', async () => {
+    removeFakeWindow();
+    vi.resetModules();
+    const m = await import('../src/extension/extension-bridge');
+    expect(() => m.setTrustedOrigins(['https://a.example'])).not.toThrow();
   });
 });

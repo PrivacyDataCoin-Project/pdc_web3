@@ -119,22 +119,24 @@ export function isValidIntegratedAddress(address: string, network?: PdcNetwork):
 }
 
 /**
- * Extract payment ID from integrated address (stub - needs daemon RPC)
- * In practice, use daemon RPC split_integrated_address
+ * Payment ids are recovered with WalletRpcClient.splitIntegratedAddress.
+ * This helper fails closed instead of reporting "no payment id".
  */
-export function extractPaymentIdFromIntegratedAddress(address: string): string | null {
+export function extractPaymentIdFromIntegratedAddress(address: string): never {
   void address;
-  // This requires daemon RPC call
-  // Keeping as stub for API compatibility
-  return null;
+  throw new Error(
+    'extractPaymentIdFromIntegratedAddress requires WalletRpcClient.splitIntegratedAddress'
+  );
 }
 
 /**
- * Create integrated address (stub - needs daemon RPC)
+ * Integrated addresses are built by the wallet. Returning `address` unchanged
+ * dropped `paymentId` and could attribute a payment to the wrong invoice.
  */
-export function createIntegratedAddress(address: string, paymentId: string): string {
+export function createIntegratedAddress(address: string, paymentId: string): never {
+  void address;
   void paymentId;
-  // This requires daemon RPC call
-  // Keeping as stub for API compatibility
-  return address; // In reality, would call make_integrated_address RPC
+  throw new Error(
+    'createIntegratedAddress requires WalletRpcClient.makeIntegratedAddress; local construction would drop the payment id'
+  );
 }

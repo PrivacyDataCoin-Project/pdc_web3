@@ -6,6 +6,24 @@ import type { AxiosInstance, AxiosError } from 'axios';
 import axios from 'axios';
 import type { RpcRequest, RpcResponse, RpcError } from '../models/rpc-types';
 
+/** JSON.stringify cannot encode bigint. Wallet amounts travel as decimal strings. */
+function serializeRpcBody(data: unknown): string {
+  return JSON.stringify(data, (_key, value: unknown) =>
+    typeof value === 'bigint' ? value.toString() : value
+  );
+}
+
+/**
+ * Axios transport codes are strings (`ECONNABORTED`, `ERR_BAD_RESPONSE`).
+ * parseInt of those is NaN, which made isTransportError() miss real failures.
+ */
+function coerceRpcErrorCode(code: unknown): number {
+  if (typeof code === 'string' && /^-?\d+$/.test(code)) {
+    return parseInt(code, 10);
+  }
+  return -32603;
+}
+
 export interface RpcClientConfig {
   url: string;
   username?: string;
@@ -32,6 +50,7 @@ export class RpcClient {
         'Content-Type': 'application/json',
         ...config.headers,
       },
+      transformRequest: [(data: unknown) => serializeRpcBody(data)],
     });
 
     // Response interceptor for error handling
@@ -45,7 +64,7 @@ export class RpcClient {
         }
         throw new RpcClientError(
           error.message,
-          error.code ? parseInt(error.code, 10) : -32603,
+          coerceRpcErrorCode(error.code),
           error.response?.data
         );
       }
@@ -65,16 +84,20 @@ export class RpcClient {
     };
 
     const response = await this.client.post<RpcResponse<TResult>>('', request);
-
-    if (response.data.error) {
+    const payload = response.data;
+    if (payload == null || payload.id !== request.id) {
       throw new RpcClientError(
-        response.data.error.message,
-        response.data.error.code,
-        response.data.error.data
+        'JSON-RPC response id mismatch',
+        RPC_ERROR_CODES.INTERNAL_ERROR,
+        payload
       );
     }
 
-    return response.data.result as TResult;
+    if (payload.error) {
+      throw new RpcClientError(payload.error.message, payload.error.code, payload.error.data);
+    }
+
+    return payload.result as TResult;
   }
 
   async batchCall<TParams, TResult>(
@@ -87,13 +110,40 @@ export class RpcClient {
       params: call.params,
     }));
 
-    const response = await this.client.post<RpcResponse<TResult>[]>('', requests);
+    const response = await this.client.post<unknown>('', requests);
+    const data = response.data;
+    if (!Array.isArray(data)) {
+      throw new RpcClientError(
+        'JSON-RPC batch response is not an array',
+        RPC_ERROR_CODES.INTERNAL_ERROR,
+        data
+      );
+    }
 
-    return response.data.map(r => {
-      if (r.error) {
-        throw new RpcClientError(r.error.message, r.error.code, r.error.data);
+    const byId = new Map<number | string, RpcResponse<TResult>>();
+    for (const item of data as Array<RpcResponse<TResult> | null>) {
+      if (item == null || item.id == null) {
+        throw new RpcClientError(
+          'JSON-RPC batch item is missing id',
+          RPC_ERROR_CODES.INTERNAL_ERROR,
+          item
+        );
       }
-      return r.result as TResult;
+      byId.set(item.id, item);
+    }
+
+    return requests.map(req => {
+      const item = byId.get(req.id);
+      if (!item) {
+        throw new RpcClientError(
+          `Missing JSON-RPC batch response for id ${String(req.id)}`,
+          RPC_ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+      if (item.error) {
+        throw new RpcClientError(item.error.message, item.error.code, item.error.data);
+      }
+      return item.result as TResult;
     });
   }
 
@@ -134,7 +184,9 @@ export class RpcClientError extends Error {
   }
 
   isWalletError(): boolean {
-    return this.code >= -32099 && this.code <= -32000;
+    // JSON-RPC implementation range, plus Zano/PDC wallet codes (-1001..-1013).
+    if (this.code >= -32099 && this.code <= -32000) return true;
+    return this.code <= -1001 && this.code >= -1013;
   }
 
   isDaemonError(): boolean {

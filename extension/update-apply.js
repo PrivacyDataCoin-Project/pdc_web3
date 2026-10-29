@@ -118,9 +118,7 @@ async function readZipEntries(arrayBuffer) {
       payload = comp.slice();
     } else if (method === 8) {
       payload = await inflateRaw(comp);
-      if (uncompSize && payload.length !== uncompSize) {
-        /* tolerate minor mismatch */
-      }
+      assertUncompressedSize(uncompSize, payload.length, name);
     } else {
       throw new Error(`Unsupported ZIP method ${method} for ${name}`);
     }
@@ -129,6 +127,27 @@ async function readZipEntries(arrayBuffer) {
 
   if (!out.size) throw new Error('ZIP contained no files');
   return out;
+}
+
+/** Reject zip-slip names before they reach the directory picker. */
+function assertSafeZipPath(relPath) {
+  if (typeof relPath !== 'string' || relPath.length === 0) {
+    throw new Error('ZIP entry path is empty');
+  }
+  if (relPath.includes('\\') || relPath.includes('\0') || relPath.startsWith('/')) {
+    throw new Error(`Unsafe ZIP path: ${relPath}`);
+  }
+  const parts = relPath.split('/');
+  if (parts.some((part) => part === '' || part === '.' || part === '..')) {
+    throw new Error(`Unsafe ZIP path: ${relPath}`);
+  }
+}
+
+/** Fail closed when a deflate stream does not match the local-header size. */
+function assertUncompressedSize(expected, actual, name) {
+  if (expected && actual !== expected) {
+    throw new Error(`ZIP entry ${name} inflated to ${actual} bytes, expected ${expected}`);
+  }
 }
 
 /** Strip a single shared top-level folder (e.g. pdc-companion-v0.1.10/). */
@@ -267,6 +286,8 @@ async function applyCompanionUpdate(opts) {
     throw new Error('Update zip missing manifest.json');
   }
   for (const [rel, bytes] of entries) {
+    if (!rel) continue;
+    assertSafeZipPath(rel);
     await writeEntry(dir, rel, bytes);
   }
 
@@ -288,5 +309,7 @@ window.PdcCompanionUpdate = {
   applyCompanionUpdate,
   tryAutoApplyUpdate,
   assertAllowedZipUrl,
+  assertSafeZipPath,
+  assertUncompressedSize,
   ALLOWED_UPDATE_HOSTS: [...ALLOWED_UPDATE_HOSTS],
 };

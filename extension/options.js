@@ -137,12 +137,14 @@ $('test').addEventListener('click', async () => {
 });
 
 $('addOrigin').addEventListener('click', async () => {
-  const value = $('newOrigin').value.trim().replace(/\/+$/, '');
-  if (!validOrigin(value)) {
+  const raw = $('newOrigin').value.trim();
+  if (!validOrigin(raw)) {
     $('newOrigin').style.borderColor = '#e21e80';
     setTimeout(() => ($('newOrigin').style.borderColor = ''), 1200);
     return;
   }
+  // Store the origin only (lowercase host, no userinfo, no path).
+  const value = new URL(raw).origin;
   const { approvedOrigins = [] } = await chrome.storage.local.get('approvedOrigins');
   if (!approvedOrigins.includes(value)) {
     approvedOrigins.push(value);

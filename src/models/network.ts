@@ -31,9 +31,11 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     nativeAssetId: '0000000000000000000000000000000000000000000000000000000000000000',
     defaultDaemonPort: 19211,
     defaultWalletRpcPort: 19311,
-    defaultFee: 1000000000n, // 0.01 PDC
+    // Matches PDC currency_config.h: TX_DEFAULT_FEE / TX_MINIMUM_FEE
+    defaultFee: 10000000000n, // 0.01 PDC
     decimalPoint: 12,
-    dustThreshold: 100000000n, // 0.001 PDC
+    // Matches PDC currency_config.h: DEFAULT_DUST_THRESHOLD
+    dustThreshold: 0n,
   },
   [PdcNetwork.TESTNET]: {
     name: PdcNetwork.TESTNET,
@@ -43,9 +45,9 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     nativeAssetId: '0000000000000000000000000000000000000000000000000000000000000000',
     defaultDaemonPort: 29211,
     defaultWalletRpcPort: 29311,
-    defaultFee: 1000000000n,
+    defaultFee: 10000000000n,
     decimalPoint: 12,
-    dustThreshold: 100000000n,
+    dustThreshold: 0n,
   },
   [PdcNetwork.STAGENET]: {
     name: PdcNetwork.STAGENET,
@@ -55,9 +57,9 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     nativeAssetId: '0000000000000000000000000000000000000000000000000000000000000000',
     defaultDaemonPort: 39211,
     defaultWalletRpcPort: 39311,
-    defaultFee: 1000000000n,
+    defaultFee: 10000000000n,
     decimalPoint: 12,
-    dustThreshold: 100000000n,
+    dustThreshold: 0n,
   },
   [PdcNetwork.REGTEST]: {
     name: PdcNetwork.REGTEST,
@@ -67,9 +69,9 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     nativeAssetId: '0000000000000000000000000000000000000000000000000000000000000000',
     defaultDaemonPort: 19211,
     defaultWalletRpcPort: 19311,
-    defaultFee: 1000000000n,
+    defaultFee: 10000000000n,
     decimalPoint: 12,
-    dustThreshold: 100000000n,
+    dustThreshold: 0n,
   },
 };
 

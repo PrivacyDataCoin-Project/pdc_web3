@@ -7,7 +7,7 @@ import {
   atomicToHuman,
   humanToAtomic,
   formatAmount,
-  parseAmount
+  parseAmount,
 } from '../src/utils/bigint';
 
 describe('BigInt utilities', () => {
@@ -86,6 +86,15 @@ describe('BigInt utilities', () => {
       expect(parseAmount('1 PDC', 12, 'PDC')).toBe(1000000000000n);
       expect(parseAmount('1.5 PDC', 12, 'PDC')).toBe(1500000000000n);
       expect(parseAmount('  1.5  PDC  ', 12, 'PDC')).toBe(1500000000000n);
+    });
+
+    it('rejects multiple decimal points', () => {
+      expect(() => humanToAtomic('1.2.3', 12)).toThrow('multiple decimal points');
+    });
+
+    it('treats regex metacharacters in the ticker as literals', () => {
+      expect(parseAmount('1 MTK(', 12, 'MTK(')).toBe(1000000000000n);
+      expect(parseAmount('1.5.', 12, '.')).toBe(1500000000000n);
     });
   });
 });

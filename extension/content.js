@@ -22,8 +22,14 @@
   }
 
   // Trade site → reload after one-click file replace (unpacked install).
+  // Any other origin must not be able to reload the extension (content script is <all_urls>).
+  const COMPANION_RELOAD_ORIGINS = new Set([
+    'https://trade.privacydatacoin.com',
+    'https://privacydatacoin.com',
+  ]);
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
+    if (!COMPANION_RELOAD_ORIGINS.has(event.origin)) return;
     const data = event.data;
     if (data && data.type === 'PDC_COMPANION_REQUEST_RELOAD') {
       try {

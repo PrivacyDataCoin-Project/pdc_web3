@@ -14,7 +14,7 @@ import {
   reverseHexBytes,
   randomHex,
   keyToHex,
-  hexToKey
+  hexToKey,
 } from '../src/utils/hex';
 
 describe('Hex utilities', () => {
@@ -33,6 +33,11 @@ describe('Hex utilities', () => {
 
     it('should handle odd length error', () => {
       expect(() => hexToBytes('abc')).toThrow('even length');
+    });
+
+    it('rejects non-hex digits instead of storing zeros', () => {
+      expect(() => hexToBytes('zz')).toThrow('Invalid hex string');
+      expect(() => hexToBytes('0x0g')).toThrow('Invalid hex string');
     });
 
     it('should handle prefix option', () => {
@@ -107,6 +112,11 @@ describe('Hex utilities', () => {
       expect(reverseHexBytes('deadbeef')).toBe('efbeadde');
       expect(reverseHexBytes('0xdeadbeef')).toBe('efbeadde');
     });
+
+    it('rejects odd length and non-hex input', () => {
+      expect(() => reverseHexBytes('abc')).toThrow('even length');
+      expect(() => reverseHexBytes('zz')).toThrow('Invalid hex string');
+    });
   });
 
   describe('randomHex', () => {
@@ -123,7 +133,7 @@ describe('Hex utilities', () => {
       const hex = keyToHex(bytes);
       expect(hex.length).toBe(64);
       expect(hex).toBe('ab'.repeat(32));
-      
+
       const back = hexToKey(hex);
       expect(back).toEqual(bytes);
     });

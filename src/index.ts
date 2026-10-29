@@ -23,6 +23,7 @@ export {
   ExtensionBridge,
   ExtensionError,
   pdcExtension,
+  setTrustedOrigins,
   type ExtensionWalletInfo,
   type ExtensionAuthData,
   type ExtensionConnectionRequest,

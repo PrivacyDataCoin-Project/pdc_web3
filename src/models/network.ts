@@ -31,9 +31,9 @@ export const PDC_NETWORKS: Record<PdcNetwork, PdcNetworkConfig> = {
     nativeAssetId: '0000000000000000000000000000000000000000000000000000000000000000',
     defaultDaemonPort: 19211,
     defaultWalletRpcPort: 19311,
-    defaultFee: 1000000000n, // 0.01 PDC
+    defaultFee: 1000000000n, // 0.001 PDC (12 decimals)
     decimalPoint: 12,
-    dustThreshold: 100000000n, // 0.001 PDC
+    dustThreshold: 100000000n, // 0.0001 PDC
   },
   [PdcNetwork.TESTNET]: {
     name: PdcNetwork.TESTNET,

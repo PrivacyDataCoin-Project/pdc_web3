@@ -46,7 +46,7 @@ const result = await wallet.transfer({
     amount: 1000000000000n, // 1 PDC (12 decimals)
     asset_id: getNativeAssetId('mainnet')
   }],
-  fee: 1000000000n // 0.01 PDC
+  fee: 1000000000n // 0.001 PDC
 });
 console.log(`TX: ${result.tx_hash}`);
 
@@ -104,7 +104,7 @@ import { PdcNetwork, getNetworkConfig, getNativeAssetId } from '@privacydatacoin
 const mainnet = getNetworkConfig(PdcNetwork.MAINNET);
 console.log(mainnet.ticker); // 'PDC'
 console.log(mainnet.decimalPoint); // 12
-console.log(mainnet.defaultFee); // 1000000000n (0.01 PDC)
+console.log(mainnet.defaultFee); // 1000000000n (0.001 PDC)
 
 const nativeAssetId = getNativeAssetId(PdcNetwork.MAINNET);
 ```
@@ -165,7 +165,7 @@ const deploy = await wallet.deployAsset({
     amount: 1000000000000n,
     asset_id: nativeAssetId // payment for deployment fee
   }],
-  fee: 10000000000n
+  fee: 10000000000n // 0.01 PDC
 });
 console.log('New asset ID:', deploy.new_asset_id);
 

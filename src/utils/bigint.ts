@@ -66,7 +66,11 @@ export function humanToAtomic(human: string, decimalPoint: number): bigint {
   const negative = human.startsWith('-');
   const clean = negative ? human.slice(1) : human;
 
-  const [whole, fraction = ''] = clean.split('.');
+  const pieces = clean.split('.');
+  if (pieces.length > 2) {
+    throw new Error('Invalid amount: multiple decimal points');
+  }
+  const [whole, fraction = ''] = pieces;
   const paddedFraction = fraction.padEnd(decimalPoint, '0').slice(0, decimalPoint);
 
   const wholePart = BigInt(whole || '0') * 10n ** BigInt(decimalPoint);
@@ -86,7 +90,11 @@ export function formatAmount(
 }
 
 // Parse amount with ticker
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function parseAmount(input: string, decimalPoint: number, ticker: string): bigint {
-  const clean = input.replace(new RegExp(`\\s*${ticker}\\s*$`, 'i'), '').trim();
+  const clean = input.replace(new RegExp(`\\s*${escapeRegExp(ticker)}\\s*$`, 'i'), '').trim();
   return humanToAtomic(clean, decimalPoint);
 }

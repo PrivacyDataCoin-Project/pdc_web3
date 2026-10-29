@@ -1,5 +1,14 @@
 # PDC Companion release notes
 
+## 0.1.21
+
+- **Stable 10-minute Companion session:** pasted JWT secret is **kept across
+  sign / Trade actions** while the Qt wallet Companion RPC responds (no
+  per-action wipe). Cleared only after **10 minutes offline**.
+- **JWT access-token `exp`:** **10 minutes** (aligned with wallet salt window).
+- **UI copy:** Options / popup no longer claim a forced 10-minute secret wipe
+  while the wallet is online.
+
 ## 0.1.20
 
 - **Fail-closed hardening:** reject invalid hex silently becoming zeros; correlate

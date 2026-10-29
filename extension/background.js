@@ -122,10 +122,11 @@ async function sha256Hex(text) {
 }
 
 /**
- * JWT exp claim lifetime (seconds). A fresh token is minted on every RPC call.
- * Must stay below the wallet salt anti-replay window (1h in wallet_rpc_server).
+ * JWT exp claim lifetime (seconds). A fresh token is minted on every RPC call
+ * (signing / Trade actions do NOT rotate the stored Companion Secret).
+ * Must stay ≤ the wallet salt anti-replay window (10 min in wallet_rpc_server).
  */
-const JWT_EXP_SECONDS = 30 * 60;
+const JWT_EXP_SECONDS = 10 * 60;
 
 /** MV3 service-worker keepalive + wallet presence probe. */
 const KEEPALIVE_ALARM = 'pdc-keepalive';
@@ -138,12 +139,12 @@ const KEEPALIVE_PERIOD_MINUTES = 1;
 const LEGACY_JWT_SECRET_ROTATE_ALARM = 'pdc-jwt-secret-rotate';
 
 /**
- * Clear stored Companion JWT secret only after the wallet RPC has been
- * unreachable for this long (Companion OFF / wallet closed). While RPC
- * responds, the secret is kept so Trade stays connected.
+ * Stable Companion session: keep the pasted JWT secret across many RPC /
+ * sign actions while the wallet responds. Clear it only after the wallet RPC
+ * stays unreachable for this long (Companion OFF / wallet closed / idle).
  */
 const WALLET_OFFLINE_CLEAR_ALARM = 'pdc-wallet-offline-clear';
-const WALLET_OFFLINE_CLEAR_MINUTES = 60;
+const WALLET_OFFLINE_CLEAR_MINUTES = 10;
 
 /** HS256 JWT matching Zano Companion / docs.zano.org JWT guide. */
 async function createAccessToken(httpBody, secret) {
@@ -687,7 +688,7 @@ async function clearJwtSecretAfterWalletOffline() {
       iconUrl: 'icons/icon128.png',
       title: 'PDC Companion',
       message:
-        'Wallet Companion was offline for a while — stored secret cleared. Unlock the Qt wallet, enable Companion, then paste the Secret into Options.',
+        'Wallet Companion offline for 10 minutes — session ended. Unlock Qt, enable Companion, paste the Secret into Options (stays valid while the wallet is up).',
       priority: 2,
       requireInteraction: true,
     });

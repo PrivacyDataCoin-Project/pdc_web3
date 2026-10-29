@@ -64,8 +64,9 @@
     <input id="jwtSecret" type="password" autocomplete="off" placeholder="Paste Secret from Pdc GUI" />
     <div class="hint">
       Sent as <code>Pdc-Access-Token</code> (HS256 + body hash). Required for port 19211.
-      For security the secret is cleared after <strong>10 minutes</strong> — regenerate in the
-      wallet and paste a new key when notified.
+      Paste once: the secret stays for a <strong>stable session</strong> while the wallet
+      Companion RPC responds (signing / Trade actions do not clear it). It is cleared only
+      after <strong>10 minutes offline</strong> — then paste again from Qt Settings.
     </div>
 
     <label for="rpcLogin">RPC login (simplewallet only, optional)</label>

@@ -1,5 +1,16 @@
 # PDC Companion release notes
 
+## 0.1.20
+
+- **Fail-closed hardening:** reject invalid hex silently becoming zeros; correlate
+  JSON-RPC batch replies by id; pin ExtensionBridge to the page origin; block
+  seed/key export via `pdc.callWalletRpc`; reject zip-slip and inflated-size
+  mismatch on Companion update; limit extension reload to Trade / site origins.
+- **SDK defaults:** `defaultFee` aligned with PDC/Zano `TX_DEFAULT_FEE`
+  (`10000000000` = **0.01 PDC**); `dustThreshold` = `0`.
+- **Bridge:** `pdc.connect` / `pdc.disconnect` aliases; bigint params as decimal
+  strings; origin allowlist no longer accepts every `chrome-extension://` id.
+
 ## 0.1.19
 
 - **Fix `getBalance(asset_id)` for CAs:** read unlocked/locked from
